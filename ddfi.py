@@ -20,7 +20,7 @@ parser.add_argument('-ac','--audio_codec',required=False,type=str,help='output a
 parser.add_argument('-al','--audio_channel_layout',required=False,type=str,help='output audio channel layout, \nuse the name in ffmpeg. default stereo\n ')
 parser.add_argument('-ab','--audio_bitrate',required=False,type=str,help='output audio bitrate, use it like in ffmpeg. default 256k\n ')
 parser.add_argument('-cd','--consecutive_drop_max',required=False,type=int,help='set the maximum number of consecutive dropped frames. \ndefault 2. this will be passed to the \"max\" option of ffmpeg filter mpdecimate.\n ')
-parser.add_argument('--ffmpeg_params_output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"\" (empty)\n ')
+parser.add_argument('--ffmpeg_params_output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1\"\n ')
 parser.parse_args(sys.argv[1:],args)
 
 inFile=args.input
@@ -40,7 +40,7 @@ codecov='-c:v libx264' if args.video_codec is None else f'-c:v {args.video_codec
 codecoa='-c:a aac' if args.audio_codec is None else f'-c:a {args.audio_codec}'
 clo='-channel_layout stereo' if args.audio_channel_layout is None else f'-channel_layout {args.audio_channel_layout}'
 abo='-b:a 256k' if args.audio_bitrate is None else f'-b:a {args.audio_bitrate}'
-ffparamo='' if args.ffmpeg_params_output is None else args.ffmpeg_params_output
+ffparamo='-map_metadata -1' if args.ffmpeg_params_output is None else args.ffmpeg_params_output
 mpdmax=2 if args.consecutive_drop_max is None else args.consecutive_drop_max
 
 tmpDedup=os.path.abspath(tmpFolder+'dedup_done.mkv')
@@ -51,6 +51,7 @@ tmpTSV2N=f'{tmpFolder}tsv2nX{xinterp}.txt'
 ffpath=''
 mmgpath='D:\\Softwares\\Mkvtoolnix\\'
 dllpath=os.path.dirname(os.path.realpath(__file__))
+vspipepath=''
 
 if not os.path.exists(inFile):
     print('input file isn\'t exist')
@@ -75,26 +76,44 @@ if not os.path.exists(tmpDedup):
     os.rename(f'{tmpFolder}dedup.mkv',tmpDedup)
 
 if not os.path.exists(tmpInterpXn):
-    script=f'''LoadPlugin(\"{dllpath}\\LSMASHSource.dll\")
-LoadPlugin(\"{dllpath}\\svpflow1.dll\")
-LoadPlugin(\"{dllpath}\\svpflow2.dll\")
-LWLibavVideoSource(\"{tmpDedup}\")
-AssumeFPS(10)
+    script='''import vapoursynth as vs
+from vapoursynth import core
 '''
-    script+='''
-Threads=4
-super_params="{pel:2,gpu:1}"
-analyse_params="""{block:{w:16,h:16}, main:{search:{coarse:{distance:-10}}}, refine:[{thsad:200}]}""" 
-smoothfps_params="{rate:{num:%d,den:2},algo:23,cubic:1}"
-super = SVSuper(super_params)
-vectors = SVAnalyse(super, analyse_params)
-SVSmoothFps(super, vectors, smoothfps_params, mt=threads)
-Prefetch(threads)
+    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\LSMASHSource.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\LSMASHSource.dll")):
+        script+=f'core.std.LoadPlugin(r\"{dllpath}\\LSMASHSource.dll\")\n'
+
+    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\svpflow1_vs64.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\svpflow1_vs64.dll")):
+        script+=f'core.std.LoadPlugin(r\"{dllpath}\\svpflow1_vs64.dll\")\n'
+
+    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\svpflow2_vs64.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\svpflow2_vs64.dll")):
+        script+=f'core.std.LoadPlugin(r\"{dllpath}\\svpflow2_vs64.dll\")\n'
+
+    script+=f'clip = core.lsmas.LWLibavSource(r\"{tmpDedup}\")\nclip = core.std.AssumeFPS(clip,fpsnum=10,fpsden=1)\n'
+
+    script+='''crop_string = ""
+resize_string = ""
+super_params = "{pel:2,gpu:1}"
+analyse_params = "{block:{w:16,h:16},main:{search:{coarse:{distance:-10}}},refine:[{thsad:200}]}"
+smoothfps_params = "{rate:{num:%d,den:2},algo:23,cubic:1}"
+def interpolate(clip):
+    input = clip
+    if crop_string!='':
+        input = eval(crop_string)
+    if resize_string!='':
+        input = eval(resize_string)
+    super   = core.svp1.Super(input,super_params)
+    vectors = core.svp1.Analyse(super["clip"],super["data"],input,analyse_params)
+    smooth  = core.svp2.SmoothFps(input,super["clip"],super["data"],vectors["clip"],vectors["data"],smoothfps_params,src=clip)
+    smooth  = core.std.AssumeFPS(smooth,fpsnum=smooth.fps_num,fpsden=smooth.fps_den)
+    return smooth
+clip =  interpolate(clip)
+clip.set_output()
 ''' % (2*xinterp)
-    avs=open(f'{tmpFolder}interpX{xinterp}.avs','w')
-    print(script,file=avs)
-    avs.close()
-    ff_interp=f'\"{ffpath}ffmpeg\" -i \"{tmpFolder}interpX{xinterp}.avs\" -crf {crfi} -preset 1 -pix_fmt yuv420p -c:v libx264 -map v:0 \"{tmpFolder}interp.264\" -y'
+
+    vpy=open(f'{tmpFolder}interpX{xinterp}.vpy','w')
+    print(script,file=vpy)
+    vpy.close()
+    ff_interp=f'\"{vspipepath}vspipe.exe\" -y \"{tmpFolder}interpX{xinterp}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -crf {crfi} -preset 1 -pix_fmt yuv420p -c:v libx264 -map v:0 \"{tmpFolder}interp.264\" -y'
     print(ff_interp)
     subprocess.run(ff_interp,shell=True)
     os.rename(f'{tmpFolder}interp.264',tmpInterpXn)
