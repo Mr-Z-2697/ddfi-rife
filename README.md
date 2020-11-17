@@ -9,3 +9,17 @@ The basic idea:
 5. Convert to 60fps(60000/1001) cfr video
 
 *(yeah, its basically just simply excuting commands automatically except new-timestamps calculating part)*
+
+Usage: run ddfi.py -h for detail
+
+Example:
+
+a: this script | b: use svp directly
+
+![](https://github.com/Mr-Z-2697/ddfi/blob/main/example/ddfi.webp?raw=true)
+![](https://github.com/Mr-Z-2697/ddfi/blob/main/example/simp.webp?raw=true)
+
+Downsides:
+
+more visible artifacts
+![](https://github.com/Mr-Z-2697/ddfi/blob/main/example/artifacts.webp?raw=true)
