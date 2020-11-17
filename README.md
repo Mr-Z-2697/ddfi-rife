@@ -12,7 +12,7 @@ A clumsy video auto duplication remove and frame interpolate script (mainly for 
 *(yeah, its basically just simply excuting commands automatically except new-timestamps calculating part)*
 
 ## Usage:
-run ddfi.py -h for detail
+run `ddfi.py -h` for detail
 
 ## Example:
 a: this script | b: use svp directly
