@@ -1,4 +1,5 @@
 # ddfi
+#### dedup frame interpolate
 A clumsy video auto duplication remove and frame interpolate script (mainly for 24fps cfr animation with dup-frames)
 
 ## The basic idea:
