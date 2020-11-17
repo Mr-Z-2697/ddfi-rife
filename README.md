@@ -1,3 +1,4 @@
+[中文说明](https://github.com/Mr-Z-2697/ddfi/blob/main/README.chi.md)☚
 # ddfi
 #### dedup frame interpolate
 A clumsy video auto duplication remove and frame interpolate script (mainly for 24fps cfr animation with dup-frames)
