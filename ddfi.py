@@ -69,18 +69,12 @@ if os.path.exists(tmpFolder):
 else:
     os.mkdir(tmpFolder)
 
-if not os.path.exists(tmpDedup):
-    ff_mpdecimate=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate=max={mpdmax} -crf {crfi} -preset 1 -pix_fmt yuv420p -sample_fmt s16 -c:v libx264 -c:a flac -map v:0 {clo} {ffau} \"{tmpFolder}dedup.mkv\" -y'
-    print(ff_mpdecimate)
-    subprocess.run(ff_mpdecimate,shell=True)
-    os.rename(f'{tmpFolder}dedup.mkv',tmpDedup)
-
 if not os.path.exists(tmpInterpXn):
     script='''import vapoursynth as vs
 from vapoursynth import core
 '''
-    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\LSMASHSource.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\LSMASHSource.dll")):
-        script+=f'core.std.LoadPlugin(r\"{dllpath}\\LSMASHSource.dll\")\n'
+    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\vsrawsource.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\vsrawsource.dll")):
+        script+=f'core.std.LoadPlugin(r\"{dllpath}\\vsrawsource.dll\")\n'
 
     if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\svpflow1_vs64.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\svpflow1_vs64.dll")):
         script+=f'core.std.LoadPlugin(r\"{dllpath}\\svpflow1_vs64.dll\")\n'
@@ -88,7 +82,7 @@ from vapoursynth import core
     if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\svpflow2_vs64.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\svpflow2_vs64.dll")):
         script+=f'core.std.LoadPlugin(r\"{dllpath}\\svpflow2_vs64.dll\")\n'
 
-    script+=f'clip = core.lsmas.LWLibavSource(r\"{tmpDedup}\")\nclip = core.std.AssumeFPS(clip,fpsnum=10,fpsden=1)\n'
+    script+=f'clip = core.raws.Source(r\"-\")\nclip = core.std.AssumeFPS(clip,fpsnum=10,fpsden=1)\n'
 
     script+='''crop_string = ""
 resize_string = ""
@@ -113,9 +107,10 @@ clip.set_output()
     vpy=open(f'{tmpFolder}interpX{xinterp}.vpy','w')
     print(script,file=vpy)
     vpy.close()
-    ff_interp=f'\"{vspipepath}vspipe.exe\" -y \"{tmpFolder}interpX{xinterp}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -crf {crfi} -preset 1 -pix_fmt yuv420p -c:v libx264 -map v:0 \"{tmpFolder}interp.264\" -y'
+    ff_interp=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -lavfi [0:v:0]mpdecimate=max={mpdmax},split[a][b];[b]setpts=N/(10*TB)[b] -map [a] {ffau} {clo} -c:a flac -c:v libx264 -preset 1 -s 160x90 -y \"{tmpFolder}dedup.mkv\" -map [b] -r 10 -pix_fmt yuv420p -f yuv4mpegpipe - | \"{vspipepath}vspipe.exe\" -y \"{tmpFolder}interpX{xinterp}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -crf {crfi} -preset 1 -pix_fmt yuv420p -vsync vfr -c:v libx264 -map v:0 \"{tmpFolder}interp.264\" -y'
     print(ff_interp)
     subprocess.run(ff_interp,shell=True)
+    os.rename(f'{tmpFolder}dedup.mkv',tmpDedup)
     os.rename(f'{tmpFolder}interp.264',tmpInterpXn)
 
 if not os.path.exists(f'{tmpInterpXn}.mkv'):
