@@ -1,7 +1,8 @@
 import os,sys
 import argparse
 import subprocess
-
+toolsFolder=f'{os.path.dirname(os.path.realpath(__file__))}\\tools\\'
+sys.path.append(toolsFolder)
 class args:
     pass
 parser = argparse.ArgumentParser(description='animation auto duplicated frame remove and frame interpolate tool',formatter_class=argparse.RawTextHelpFormatter)
@@ -11,11 +12,11 @@ parser.add_argument('-tf','--temp_folder',required=False,type=str,help='temp fol
 parser.add_argument('-st','--start_time',required=False,type=str,help='cut input video from this time, format h:mm:ss.nnn or seconds\n ')
 parser.add_argument('-et','--end_time',required=False,type=str,help='cut input video end to this time, format h:mm:ss.nnn or seconds\n ')
 parser.add_argument('-as','--audio_stream',required=True,type=int,help='set audio stream index, starts from 0, \"no\" means don\'t output audio\n ')
-parser.add_argument('-ir','--input_framerate',required=False,type=int,help='set input framerate, for calculate VFRToCFR target, \ndefault 24\n ')
 parser.add_argument('-q','--output_crf',required=False,type=int,help='output video crf value, interger. if a codec don\'t has -crf option is used, \n--ffmpeg_params_output can be used as a workaround. default 18\n ')
 parser.add_argument('-qi','--intermedia_crf',required=False,type=int,help='intermedia video crf value, interger. almost useless now. \ndefault 12\n ')
 parser.add_argument('-if','--interpolation_factor',required=False,type=int,help='interpolation factor, interger. default 8, \nnot recommend to decrease it\n ')
-parser.add_argument('-tr','--target_framerate',required=False,type=str,help='target framerate, only affects final output, \ncan be fraction, interger or decimal. default 60\n ')
+parser.add_argument('-tr','--target_framerate',required=False,type=str,help='target framerate, only affects final output, \nshould be fraction or interger. default 60000/1001\n ')
+parser.add_argument('-ir','--input_framerate',required=False,type=str,help='set input framerate, for calculate VFRToCFR target, \nshould be fraction or interger. default 24000/1001\n ')
 parser.add_argument('-vc','--video_codec',required=False,type=str,help='output video codec, use the name in ffmpeg, \nwill be constrained by output format. default libx264\n ')
 parser.add_argument('-ac','--audio_codec',required=False,type=str,help='output audio codec, similar to -vc. default aac\n ')
 parser.add_argument('-al','--audio_channel_layout',required=False,type=str,help='output audio channel layout, \nuse the name in ffmpeg. default stereo\n ')
@@ -35,7 +36,7 @@ ffau='' if args.audio_stream == 'no' else f'-map a:{args.audio_stream}'
 ffau2='' if args.audio_stream == 'no' else f'-map 1:a:0'
 crfo=18 if args.output_crf is None else args.output_crf
 crfi=12 if args.intermedia_crf is None else args.intermedia_crf
-fri=24 if args.input_framerate is None else args.input_framerate
+fri=['24000','1001'] if args.input_framerate is None else args.input_framerate.split('/')
 xinterp=8 if args.interpolation_factor is None else args.interpolation_factor
 fro='60' if args.target_framerate is None else args.target_framerate
 codecov='-c:v libx264' if args.video_codec is None else f'-c:v {args.video_codec}'
@@ -46,13 +47,10 @@ ffparamo='-map_metadata -1' if args.ffmpeg_params_output is None else args.ffmpe
 mpdmax=2 if args.consecutive_drop_max is None else args.consecutive_drop_max
 
 tmpDedup=os.path.abspath(tmpFolder+'dedup_intermedia.mkv')
-#tmpInterpXn=f'{tmpFolder}interpX{xinterp}_done.264'
 tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
 tmpTSV2N=os.path.abspath(f'{tmpFolder}tsv2nX{xinterp}.txt')
 
-ffpath=''
-mmgpath='D:\\Softwares\\Mkvtoolnix\\'
-dllpath=os.path.dirname(os.path.realpath(__file__))
+ffpath=mmgpath=dllpath=toolsFolder
 vspipepath=''
 
 def newTSgen():
@@ -79,29 +77,6 @@ def newTSgen():
     print(ts_o[len(ts_o)-1],file=outfile)
     f.close()
     outfile.close()
-
-if not os.path.exists(inFile):
-    print('input file isn\'t exist')
-    exit()
-if os.path.exists(outFile):
-    if input('output file exists, continue? (y/n) ')=='y':
-        pass
-    else:
-        exit()
-if os.path.exists(tmpFolder):
-    if input('temp folder exists, continue? (y/n) ')=='y':
-        pass
-    else:
-        exit()
-else:
-    os.mkdir(tmpFolder)
-
-if not os.path.exists(tmpDedup):
-    ff_intermedia=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate=max={mpdmax} -map 0:v:0 {ffau} {clo} -crf {crfi} -c:a flac -c:v libx264 -preset 1 -s 160x90 -y \"{tmpFolder}dedup.mkv\"'
-    print(ff_intermedia)
-    subprocess.run(ff_intermedia,shell=True)
-    os.rename(f'{tmpFolder}dedup.mkv',tmpDedup)
-    newTSgen()
 
 def vpyGen():
     script='''import vapoursynth as vs
@@ -138,28 +113,38 @@ def interpolate(clip):
     smooth  = core.std.AssumeFPS(smooth,fpsnum=smooth.fps_num,fpsden=smooth.fps_den)
     return smooth
 clip = interpolate(clip)
-clip = core.vfrtocfr.VFRToCFR(clip,r"%s",%d,1,True)
+clip = core.vfrtocfr.VFRToCFR(clip,r"%s",%d,%s,True)
 clip.set_output()
-''' % (2*xinterp,tmpTSV2N,fri*xinterp)
+''' % (2*xinterp,tmpTSV2N,int(fri[0])*xinterp,1 if len(fri)==1 else fri[1])
 
     vpy=open(f'{tmpFolder}interpX{xinterp}.vpy','w')
     print(script,file=vpy)
     vpy.close()
 
-if not os.path.exists(f'{tmpFolder}interpX{xinterp}.vpy'):
+if not os.path.exists(inFile):
+    print('input file isn\'t exist')
+    exit()
+if os.path.exists(outFile):
+    if input('output file exists, continue? (y/n) ')=='y':
+        pass
+    else:
+        exit()
+if os.path.exists(tmpFolder):
+    if input('temp folder exists, continue? (y/n) ')=='y':
+        pass
+    else:
+        exit()
+else:
+    os.mkdir(tmpFolder)
+
+if not os.path.exists(tmpDedup):
+    ff_intermedia=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate=max={mpdmax} -map 0:v:0 {ffau} {clo} -crf {crfi} -c:a flac -c:v libx264 -preset 1 -s 160x90 -y \"{tmpFolder}dedup.mkv\"'
+    print(ff_intermedia)
+    subprocess.run(ff_intermedia,shell=True)
+    os.rename(f'{tmpFolder}dedup.mkv',tmpDedup)
+    newTSgen()
     vpyGen()
 
-ff_interp=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate=max={mpdmax},setpts=N/(10*TB) -map 0:v:0 -r 10 -pix_fmt yuv420p -f yuv4mpegpipe - | \"{vspipepath}vspipe.exe\" -y \"{tmpFolder}interpX{xinterp}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i {tmpDedup} -map 0:v:0 {ffau2} -vf framerate={fro} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
-print(ff_interp)
-subprocess.run(ff_interp,shell=True)
-    #os.rename(f'{tmpFolder}interp.264',tmpInterpXn)
-'''
-if not os.path.exists(f'{tmpInterpXn}.mkv'):
-    mmg=f'\"{mmgpath}mkvmerge.exe\" -o \"{tmpInterpXn}.mkv\" --timestamps 0:\"{tmpTSV2N}\" \"{tmpInterpXn}\"'
-    print(mmg)
-    subprocess.run(mmg,shell=True)
-
-ff_down60=f'\"{ffpath}ffmpeg.exe\" -i \"{tmpInterpXn}.mkv\" -i {tmpDedup}  \"{outFile}\" -y'
-print(ff_down60)
-subprocess.run(ff_down60,shell=True)
-'''
+cmdinterp=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate=max={mpdmax},setpts=N/(10*TB) -map 0:v:0 -r 10 -pix_fmt yuv420p -f yuv4mpegpipe - | \"{vspipepath}vspipe.exe\" -y \"{tmpFolder}interpX{xinterp}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i {tmpDedup} -map 0:v:0 {ffau2} -vf framerate={fro} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
+print(cmdinterp)
+subprocess.run(cmdinterp,shell=True)
