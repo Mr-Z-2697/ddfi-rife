@@ -5,7 +5,7 @@ toolsFolder=f'{os.path.dirname(os.path.realpath(__file__))}\\tools\\'
 sys.path.append(toolsFolder)
 class args:
     pass
-parser = argparse.ArgumentParser(description='animation auto duplicated frame remove and frame interpolate tool',formatter_class=argparse.RawTextHelpFormatter)
+parser = argparse.ArgumentParser(description='an animation auto duplicated frame remove and frame interpolate script, uses ffmpeg, mkvextract, and vapoursynth.',formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-i','--input',required=True,type=str,help='source file, any format ffmpeg can decode\n ')
 parser.add_argument('-o','--output',required=False,type=str,help='output file, default \"input file\"_interp.mkv\n ')
 parser.add_argument('-tf','--temp_folder',required=False,type=str,help='temp folder, default \"output file\"_tmp\\\n ')
@@ -22,11 +22,16 @@ parser.add_argument('-ac','--audio_codec',required=False,type=str,help='output a
 parser.add_argument('-al','--audio_channel_layout',required=False,type=str,help='output audio channel layout, \nuse the name in ffmpeg. default stereo\n ')
 parser.add_argument('-ab','--audio_bitrate',required=False,type=str,help='output audio bitrate, use it like in ffmpeg. default 256k\n ')
 parser.add_argument('-cd','--consecutive_drop_max',required=False,type=int,help='set the maximum number of consecutive dropped frames. \ndefault 2. this will be passed to the \"max\" option of ffmpeg filter mpdecimate.\n ')
+parser.add_argument('-blk','--svp_blk_size',required=False,type=str,help='set block size of svp analyse params, can be 4/8/16/32, one interger for both w&h \nor two comma seperated intergers for w,h. default 16\n ')
 parser.add_argument('--ffmpeg_params_output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1\"\n ')
+parser.add_argument('--dont_be_scared',required=False,type=str,help='i know you are seeing a lot of arguments up there, but don\'t be scared! \nthe important ones are only -i, -o, -as, [-st], [-et] \nand what this argument do? give a number or just right click open with blahblah')
 parser.parse_args(sys.argv[1:],args)
 
 inFile=args.input
-outFile=os.path.splitext(inFile)[0]+'_interp.mkv' if args.output is None else args.output
+if args.dont_be_scared is not None:
+    outFile=os.path.splitext(inFile)[0]+'_=w=.mkv' if args.output is None else os.path.splitext(args.output)[0]+'_=w='+os.path.splitext(args.output)[1]
+else:
+    outFile=os.path.splitext(inFile)[0]+'_interp.mkv' if args.output is None else args.output
 tmpFolder=os.path.splitext(outFile)[0]+'_tmp\\' if args.temp_folder is None else args.temp_folder+'\\'
 #tmpFolder+='\\' if tmpFolder[-1] is not '\\' else ''
 
@@ -45,6 +50,7 @@ clo='-channel_layout stereo' if args.audio_channel_layout is None else f'-channe
 abo='-b:a 256k' if args.audio_bitrate is None else f'-b:a {args.audio_bitrate}'
 ffparamo='-map_metadata -1' if args.ffmpeg_params_output is None else args.ffmpeg_params_output
 mpdmax=2 if args.consecutive_drop_max is None else args.consecutive_drop_max
+svpblks=['16'] if args.svp_blk_size is None else args.svp_blk_size.split(',')
 
 tmpDedup=os.path.abspath(tmpFolder+'dedup_intermedia.mkv')
 tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
@@ -53,10 +59,21 @@ tmpTSV2N=os.path.abspath(f'{tmpFolder}tsv2nX{xinterp}.txt')
 ffpath=mmgpath=dllpath=toolsFolder
 vspipepath=''
 
+try:
+    import vapoursynth
+except:
+    print('vapoursynth environment is needed, it seems like you don\'t have one.')
+    exit()
+highestFPS=float(xinterp) * float(fri[0]) if len(fri)==1 else (float(fri[0])/float(fri[1]))
+if highestFPS >= 1000:
+    print('interpolation factor too high! if x ir shoud be less than 1000.')
+    exit()
+
 def newTSgen():
-    mEx=f'\"{mmgpath}mkvextract.exe\" \"{tmpDedup}\" timestamps_v2 0:\"{tmpTSV2O}\"'
-    print(mEx)
-    subprocess.run(mEx,shell=True)
+    if not os.path.exists(tmpTSV2O):
+        mEx=f'\"{mmgpath}mkvextract.exe\" \"{tmpDedup}\" timestamps_v2 0:\"{tmpTSV2O}\"'
+        print(mEx)
+        subprocess.run(mEx,shell=True)
     
     ts_o=list()
     ts_new=list()
@@ -99,7 +116,7 @@ from vapoursynth import core
     script+='''crop_string = ""
 resize_string = ""
 super_params = "{pel:2,gpu:1}"
-analyse_params = "{block:{w:16,h:16},main:{search:{coarse:{distance:-10}}},refine:[{thsad:200}]}"
+analyse_params = "{block:{w:%s,h:%s},main:{search:{coarse:{distance:-10}}},refine:[{thsad:200}]}"
 smoothfps_params = "{rate:{num:%d,den:2},algo:23,cubic:1}"
 def interpolate(clip):
     input = clip
@@ -115,9 +132,9 @@ def interpolate(clip):
 clip = interpolate(clip)
 clip = core.vfrtocfr.VFRToCFR(clip,r"%s",%d,%s,True)
 clip.set_output()
-''' % (2*xinterp,tmpTSV2N,int(fri[0])*xinterp,1 if len(fri)==1 else fri[1])
+''' % (svpblks[0] , svpblks[0] if len(svpblks)==1 else svpblks[1] , 2*xinterp , tmpTSV2N , int(fri[0])*xinterp , 1 if len(fri)==1 else fri[1])
 
-    vpy=open(f'{tmpFolder}interpX{xinterp}.vpy','w')
+    vpy=open(f'{tmpFolder}interpX{xinterp}.vpy','w',encoding='utf-8')
     print(script,file=vpy)
     vpy.close()
 
@@ -142,9 +159,9 @@ if not os.path.exists(tmpDedup):
     print(ff_intermedia)
     subprocess.run(ff_intermedia,shell=True)
     os.rename(f'{tmpFolder}dedup.mkv',tmpDedup)
-    newTSgen()
-    vpyGen()
 
+newTSgen()
+vpyGen()
 cmdinterp=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate=max={mpdmax},setpts=N/(10*TB) -map 0:v:0 -r 10 -pix_fmt yuv420p -f yuv4mpegpipe - | \"{vspipepath}vspipe.exe\" -y \"{tmpFolder}interpX{xinterp}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i {tmpDedup} -map 0:v:0 {ffau2} -vf framerate={fro} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
 print(cmdinterp)
 subprocess.run(cmdinterp,shell=True)
