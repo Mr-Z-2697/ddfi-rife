@@ -11,7 +11,7 @@ parser.add_argument('-o','--output',required=False,type=str,help='output file, d
 parser.add_argument('-tf','--temp_folder',required=False,type=str,help='temp folder, default \"output file\"_tmp\\\n ')
 parser.add_argument('-st','--start_time',required=False,type=str,help='cut input video from this time, format h:mm:ss.nnn or seconds\n ')
 parser.add_argument('-et','--end_time',required=False,type=str,help='cut input video end to this time, format h:mm:ss.nnn or seconds\n ')
-parser.add_argument('-as','--audio_stream',required=True,type=int,help='set audio stream index, starts from 0, \"no\" means don\'t output audio\n ')
+parser.add_argument('-as','--audio_stream',required=True,type=str,help='set audio stream index, starts from 0, \"no\" means don\'t output audio\n ')
 parser.add_argument('-q','--output_crf',required=False,type=int,help='output video crf value, interger. if a codec don\'t has -crf option is used, \n--ffmpeg_params_output can be used as a workaround. default 18\n ')
 parser.add_argument('-qi','--intermedia_crf',required=False,type=int,help='intermedia video crf value, interger. almost useless now. \ndefault 12\n ')
 parser.add_argument('-if','--interpolation_factor',required=False,type=int,help='interpolation factor, interger. default 8, \nnot recommend to decrease it\n ')
@@ -37,8 +37,8 @@ tmpFolder=os.path.splitext(outFile)[0]+'_tmp\\' if args.temp_folder is None else
 
 ffss='' if args.start_time is None else f'-ss {args.start_time}'
 ffto='' if args.end_time is None else f'-to {args.end_time}'
-ffau='' if args.audio_stream == 'no' else f'-map a:{args.audio_stream}'
-ffau2='' if args.audio_stream == 'no' else f'-map 1:a:0'
+ffau='-an' if args.audio_stream == 'no' else f'-map a:{args.audio_stream}'
+ffau2='-an' if args.audio_stream == 'no' else f'-map 1:a:0'
 crfo=18 if args.output_crf is None else args.output_crf
 crfi=12 if args.intermedia_crf is None else args.intermedia_crf
 fri=['24000','1001'] if args.input_framerate is None else args.input_framerate.split('/')
@@ -57,7 +57,7 @@ tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
 tmpTSV2N=os.path.abspath(f'{tmpFolder}tsv2nX{xinterp}.txt')
 
 ffpath=mmgpath=dllpath=toolsFolder
-vspipepath=''
+vspipepath=toolsFolder+'python-vapoursynth-plugins\\'
 
 try:
     import vapoursynth
@@ -99,17 +99,17 @@ def vpyGen():
     script='''import vapoursynth as vs
 from vapoursynth import core
 '''
-    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\vsrawsource.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\vsrawsource.dll")):
-        script+=f'core.std.LoadPlugin(r\"{dllpath}\\vsrawsource.dll\")\n'
+#    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\vsrawsource.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\vsrawsource.dll")):
+#        script+=f'core.std.LoadPlugin(r\"{dllpath}\\vsrawsource.dll\")\n'
 
-    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\svpflow1_vs64.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\svpflow1_vs64.dll")):
-        script+=f'core.std.LoadPlugin(r\"{dllpath}\\svpflow1_vs64.dll\")\n'
+#    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\svpflow1_vs64.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\svpflow1_vs64.dll")):
+#        script+=f'core.std.LoadPlugin(r\"{dllpath}\\svpflow1_vs64.dll\")\n'
 
-    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\svpflow2_vs64.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\svpflow2_vs64.dll")):
-        script+=f'core.std.LoadPlugin(r\"{dllpath}\\svpflow2_vs64.dll\")\n'
+#    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\svpflow2_vs64.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\svpflow2_vs64.dll")):
+#        script+=f'core.std.LoadPlugin(r\"{dllpath}\\svpflow2_vs64.dll\")\n'
     
-    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\VFRToCFRVapoursynth.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\VFRToCFRVapoursynth.dll")):
-        script+=f'core.std.LoadPlugin(r\"{dllpath}\\VFRToCFRVapoursynth.dll\")\n'
+#    if not (os.path.exists(r"C:\Program Files\Vapoursynth\plugins\VFRToCFRVapoursynth.dll") or os.path.exists(r"C:\Program Files (x86)\Vapoursynth\plugins\VFRToCFRVapoursynth.dll")):
+#        script+=f'core.std.LoadPlugin(r\"{dllpath}\\VFRToCFRVapoursynth.dll\")\n'
 
     script+=f'clip = core.raws.Source(r\"-\")\nclip = core.std.AssumeFPS(clip,fpsnum=10,fpsden=1)\n'
 
@@ -162,6 +162,6 @@ if not os.path.exists(tmpDedup):
 
 newTSgen()
 vpyGen()
-cmdinterp=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate=max={mpdmax},setpts=N/(10*TB) -map 0:v:0 -r 10 -pix_fmt yuv420p -f yuv4mpegpipe - | \"{vspipepath}vspipe.exe\" -y \"{tmpFolder}interpX{xinterp}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i {tmpDedup} -map 0:v:0 {ffau2} -vf framerate={fro} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
+cmdinterp=f'\"{ffpath}ffmpeg.exe\" -loglevel 0 {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate=max={mpdmax},setpts=N/(30*TB) -map 0:v:0 -r 30 -pix_fmt yuv420p -f yuv4mpegpipe - | \"{vspipepath}vspipe.exe\" -y \"{tmpFolder}interpX{xinterp}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpDedup}\" -map 0:v:0 {ffau2} -vf framerate={fro} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
 print(cmdinterp)
 subprocess.run(cmdinterp,shell=True)
