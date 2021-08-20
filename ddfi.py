@@ -20,6 +20,8 @@ parser.add_argument('-al','--audio_channel_layout',required=False,type=str,help=
 parser.add_argument('-ab','--audio_bitrate',required=False,type=str,help='output audio bitrate, use it like in ffmpeg. default 128k\n ')
 parser.add_argument('-cm','--customize_mpdecimate_opts',required=False,type=str,help='set ffmpeg mpdecimate filter options. write it like how you use filter \nin ffmpeg. default \"max=2\"\n ')
 parser.add_argument('--ffmpeg_params_output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1 -map_chapters -1\"\n ')
+parser.add_argument('-scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\" or \"none\", default misc',default='misc')
+parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,130',default='200,130')
 parser.add_argument('--dont_be_scared',required=False,type=str,help='i know you are seeing a lot of arguments up there, but don\'t be scared! \nthe important ones are only -i, -o, -as, [-st], [-et] \nand what this argument do? give a number or just right click open with blahblah')
 parser.parse_args(sys.argv[1:],args)
 
@@ -43,6 +45,10 @@ clo='-channel_layout stereo' if args.audio_channel_layout is None else f'-channe
 abo='-b:a 128k' if args.audio_bitrate is None else f'-b:a {args.audio_bitrate}'
 ffparamo='-map_metadata -1 -map_chapters -1' if args.ffmpeg_params_output is None else args.ffmpeg_params_output
 mpdopts='2' if args.customize_mpdecimate_opts is None else args.customize_mpdecimate_opts
+
+if args.scd not in ['misc','mv','none']:
+    raise ValueError('scd must be misc, mv or none.')
+thscd1,thscd2=args.thscd.split(',')
 
 tmpDedup=os.path.abspath(tmpFolder+'dedup_intermedia.mkv')
 tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
@@ -83,18 +89,18 @@ def newTSgen():
     outfile.close()
 
 def vpyGen():
+    scd=f'sup = core.mv.Super(clip)\nbw = core.mv.Analyse(sup,isb=True)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})' if args.scd=='mv' else 'clip = core.misc.SCDetect(clip)' if args.scd=='misc' else ''
     script='''import vapoursynth as vs
 from vapoursynth import core
+core.num_threads=8
 core.max_cache_size=32768
 clip = core.raws.Source(r\"-\")
 clip = core.std.AssumeFPS(clip,fpsnum=10,fpsden=1)
-sup = core.mv.Super(clip)
-vec = core.mv.Analyse(sup,isb=True)
-clip = core.mv.SCDetection(clip,vec)
+%s
 clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)
 clip = core.rife.RIFE(clip,model=0,sc=True)
-clip = core.rife.RIFE(clip,model=0,sc=True)
-clip = core.rife.RIFE(clip,model=0,sc=True)
+clip = core.rife.RIFE(clip,model=0,sc=True,uhd=True)
+clip = core.rife.RIFE(clip,model=0,sc=True,uhd=True)
 clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1)
 clip = core.vfrtocfr.VFRToCFR(clip,r"%s",192000,1001,True)
 sup = core.mv.Super(clip)
@@ -102,7 +108,7 @@ fw = core.mv.Analyse(sup)
 bw = core.mv.Analyse(sup,isb=True)
 clip = core.mv.FlowFPS(clip,sup,bw,fw,60000,1001)
 clip.set_output()
-''' % (tmpTSV2N)
+''' % (scd,tmpTSV2N)
 
     vpy=open(f'{tmpFolder}interpX8.vpy','w',encoding='utf-8')
     print(script,file=vpy)
