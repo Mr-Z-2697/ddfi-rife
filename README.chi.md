@@ -15,11 +15,19 @@
 运行 `ddfi.py -h` 查看详细
 
 ## 例子:
-上: 此脚本 | 下: 直接svp
+左：此脚本 (rife版) | 右：直接rife (两次，配合mvtools以达到24->96->60)
 
-![](https://github.com/Mr-Z-2697/ddfi/blob/main/example/ddfi.webp?raw=true)
-![](https://github.com/Mr-Z-2697/ddfi/blob/main/example/simp.webp?raw=true)
+https://user-images.githubusercontent.com/74594146/142829178-ff08b96f-9ca7-45ab-82f0-4e95be045f2d.mp4
+
+上: 此脚本 (svp版) | 下: 直接svp
+
+![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/ddfi.webp?raw=true)
+![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/simp.webp?raw=true)
 
 ## 缺点:
 更多可见瑕疵
-![](https://github.com/Mr-Z-2697/ddfi/blob/main/example/artifacts.webp?raw=true)
+
+rife版：
+![IMG](https://user-images.githubusercontent.com/74594146/142829294-1b17c073-f587-4e49-8a72-c3c8b4149a53.png)
+svp版：
+![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/artifacts.webp?raw=true)
