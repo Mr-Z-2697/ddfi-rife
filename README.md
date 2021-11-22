@@ -16,11 +16,19 @@ A clumsy video auto duplication remove and frame interpolate script (mainly for 
 run `ddfi.py -h` for detail
 
 ## Example:
-a: this script | b: use svp directly
+left: this script(rife ver.) | right: use rife directly (2-pass, with mvtools to make 24->96->60)
 
-![](https://github.com/Mr-Z-2697/ddfi/blob/main/example/ddfi.webp?raw=true)
-![](https://github.com/Mr-Z-2697/ddfi/blob/main/example/simp.webp?raw=true)
+https://user-images.githubusercontent.com/74594146/142829178-ff08b96f-9ca7-45ab-82f0-4e95be045f2d.mp4
+
+a: this script(svp ver.) | b: use svp directly
+
+![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/ddfi.webp?raw=true)
+![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/simp.webp?raw=true)
 
 ## Downsides:
 more visible artifacts
-![](https://github.com/Mr-Z-2697/ddfi/blob/main/example/artifacts.webp?raw=true)
+
+rife ver.:
+![IMG](https://user-images.githubusercontent.com/74594146/142829294-1b17c073-f587-4e49-8a72-c3c8b4149a53.png)
+svp ver.:
+![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/artifacts.webp?raw=true)
