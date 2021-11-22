@@ -106,7 +106,7 @@ clip = core.vfrtocfr.VFRToCFR(clip,r"%s",192000,1001,True)
 sup = core.mv.Super(clip)
 fw = core.mv.Analyse(sup)
 bw = core.mv.Analyse(sup,isb=True)
-clip = core.mv.FlowFPS(clip,sup,bw,fw,60000,1001)
+clip = core.mv.FlowFPS(clip,sup,bw,fw,60,1)
 clip.set_output()
 ''' % (scd,tmpTSV2N)
 
