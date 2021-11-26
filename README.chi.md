@@ -6,7 +6,7 @@
 1. 去除重复帧 (得到一个理论上最低8fps的vfr视频)
 2. 插帧到8倍 (保证最低的8fps也能插到60fps以上)
 3. 从去重的视频提取timestamps，计算插入的帧的timestamps
-4. 在混流时加入timestamps
+4. 使用计算出的timestamps“校正”视频流
 5. 转换到60fps(60000/1001) 输出
 
 *(对，基本上除了计算新timestamps的部分以外就只是自动执行命令行)*
