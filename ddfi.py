@@ -1,6 +1,10 @@
 import os,sys
 import argparse
 import subprocess
+try:
+    import psutil as mt
+except ModuleNotFoundError:
+    import multiprocessing as mt
 toolsFolder=f'{os.path.dirname(os.path.realpath(__file__))}\\tools\\'
 sys.path.append(toolsFolder)
 class args:
@@ -20,13 +24,15 @@ parser.add_argument('-al','--audio_channel_layout',required=False,type=str,help=
 parser.add_argument('-ab','--audio_bitrate',required=False,type=str,help='output audio bitrate, use it like in ffmpeg. default 128k\n ')
 parser.add_argument('-cm','--customize_mpdecimate_opts',required=False,type=str,help='set ffmpeg mpdecimate filter options. write it like how you use filter \nin ffmpeg. default \"max=2\"\n ')
 parser.add_argument('--ffmpeg_params_output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1 -map_chapters -1\"\n ')
-parser.add_argument('-scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\" or \"none\", default misc',default='misc')
-parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,130',default='200,130')
-parser.add_argument('--dont_be_scared',required=False,type=str,help='i know you are seeing a lot of arguments up there, but don\'t be scared! \nthe important ones are only -i, -o, -as, [-st], [-et] \nand what this argument do? give a number or just right click open with blahblah')
+parser.add_argument('-scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\" or \"none\", default misc\n ',default='misc')
+parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,130\n ',default='200,130')
+parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect\n ',default=None)
+parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
+parser.add_argument('--be-cute',required=False,action='store_true',help='meow')
 parser.parse_args(sys.argv[1:],args)
 
 inFile=args.input
-if args.dont_be_scared is not None:
+if args.be_cute:
     outFile=os.path.splitext(inFile)[0]+'_=w=.mkv' if args.output is None else os.path.splitext(args.output)[0]+'_=w='+os.path.splitext(args.output)[1]
 else:
     outFile=os.path.splitext(inFile)[0]+'_interp.mkv' if args.output is None else args.output
@@ -45,6 +51,7 @@ clo='-channel_layout stereo' if args.audio_channel_layout is None else f'-channe
 abo='-b:a 128k' if args.audio_bitrate is None else f'-b:a {args.audio_bitrate}'
 ffparamo='-map_metadata -1 -map_chapters -1' if args.ffmpeg_params_output is None else args.ffmpeg_params_output
 mpdopts='2' if args.customize_mpdecimate_opts is None else args.customize_mpdecimate_opts
+threads=args.threads if args.threads else mt.cpu_count()
 
 if args.scd not in ['misc','mv','none']:
     raise ValueError('scd must be misc, mv or none.')
@@ -92,8 +99,8 @@ def vpyGen():
     scd=f'sup = core.mv.Super(clip)\nbw = core.mv.Analyse(sup,isb=True)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})' if args.scd=='mv' else 'clip = core.misc.SCDetect(clip)' if args.scd=='misc' else ''
     script='''import vapoursynth as vs
 from vapoursynth import core
-core.num_threads=8
-core.max_cache_size=32768
+core.num_threads=%d
+core.max_cache_size=%d
 clip = core.raws.Source(r\"-\")
 clip = core.std.AssumeFPS(clip,fpsnum=10,fpsden=1)
 %s
@@ -108,7 +115,7 @@ fw = core.mv.Analyse(sup)
 bw = core.mv.Analyse(sup,isb=True)
 clip = core.mv.FlowFPS(clip,sup,bw,fw,60,1)
 clip.set_output()
-''' % (scd,tmpTSV2N)
+''' % (threads,args.maxmem,scd,tmpTSV2N)
 
     vpy=open(f'{tmpFolder}interpX8.vpy','w',encoding='utf-8')
     print(script,file=vpy)
