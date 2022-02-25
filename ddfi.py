@@ -13,8 +13,8 @@ parser = argparse.ArgumentParser(description='an animation auto duplicated frame
 parser.add_argument('-i','--input',required=True,type=str,help='source file, any format ffmpeg can decode\n ')
 parser.add_argument('-o','--output',required=False,type=str,help='output file, default \"input file\"_interp.mkv\n ')
 parser.add_argument('-tf','--temp_folder',required=False,type=str,help='temp folder, default \"output file\"_tmp\\\n ')
-parser.add_argument('-st','--start_time',required=False,type=str,help='cut input video from this time, format h:mm:ss.nnn or seconds\n ')
-parser.add_argument('-et','--end_time',required=False,type=str,help='cut input video end to this time, format h:mm:ss.nnn or seconds\n ')
+parser.add_argument('-st','--start_time',required=False,type=str,help='cut input video start from this time, format h:mm:ss.nnn or seconds\n ')
+parser.add_argument('-et','--end_time',required=False,type=str,help='cut input video end at this time, format h:mm:ss.nnn or seconds\n ')
 parser.add_argument('-as','--audio_stream',required=False,type=str,help='set audio stream index, starts from 0, \n\"no\" means don\'t output audio, and is the default\n ',default='no')
 parser.add_argument('-q','--output_crf',required=False,type=int,help='output video crf value, interger. if a codec don\'t has -crf option is used, \n--ffmpeg_params_output can be used as a workaround. default 18\n ')
 parser.add_argument('-qi','--intermedia_quality_params',required=False,type=str,help='parameters associated to intermedia video quality. \nalmost useless now. default \"-crf 27 -s 16x16\"\n ')
@@ -49,7 +49,8 @@ ffau='-an' if args.audio_stream == 'no' else f'-map a:{args.audio_stream}'
 ffau2='-an' if args.audio_stream == 'no' else f'-map 1:a:0'
 crfo=18 if args.output_crf is None else args.output_crf
 qofim='-crf 27 -s 16x16' if args.intermedia_quality_params is None else args.intermedia_quality_params
-codecov='-c:v libx265 -preset 6 -x265-params sao=0:rect=0:strong-intra-smoothing=0:open-gop=0:b-intra=1:weightb=1:aq-mode=1:aq-strength=0.8:ctu=32:rc-lookahead=60' if args.video_codec is None else f'-c:v {args.video_codec}'
+x265_default='-c:v libx265 -preset 6 -x265-params sao=0:rect=0:strong-intra-smoothing=0:open-gop=0:b-intra=1:weightb=1:aq-mode=1:aq-strength=0.8:ctu=32:rc-lookahead=60:me=hex:subme=2'
+codecov=x265_default if args.video_codec is None else x265_default+':'+args.video_codec[1:] if args.video_codec[0]=='+' else f'-c:v {args.video_codec}'
 codecoa='-c:a libopus' if args.audio_codec is None else f'-c:a {args.audio_codec}'
 clo='-channel_layout stereo' if args.audio_channel_layout is None else f'-channel_layout {args.audio_channel_layout}'
 abo='-b:a 128k' if args.audio_bitrate is None else f'-b:a {args.audio_bitrate}'
@@ -109,6 +110,14 @@ def newTSgen():
 def vpyGen():
     scd=f'sup = core.mv.Super(clip)\nbw = core.mv.Analyse(sup,isb=True)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})' if args.scd=='mv' else 'clip = core.misc.SCDetect(clip)' if args.scd=='misc' else ''
     interp=\
+    '''import vsrife2
+clip = vsrife2.RIFE(clip,multi=2,scale=1,device_type='cuda',fp16={FP16})
+clip = vsrife2.RIFE(clip,multi=2,scale=1,device_type='cuda',fp16={FP16})
+clip = vsrife2.RIFE(clip,multi=2,scale=1,device_type='cuda',fp16={FP16})'''.format(FP16=args.fp16) \
+    if args.mode=='cu2' and args.model==4.0 else \
+    '''import vsrife2
+clip = vsrife2.RIFE(clip,multi=8,scale=1,device_type='cuda',fp16={FP16})'''.format(FP16=args.fp16) \
+    if args.mode in ['pytorch-cuda','cu'] and args.model==4.0 else \
     '''import vsrife
 clip = vsrife.RIFE(clip,scale=1,device_type='cuda',fp16={FP16},model_ver={MVer})
 clip = vsrife.RIFE(clip,scale=0.5,device_type='cuda',fp16={FP16},model_ver={MVer})
