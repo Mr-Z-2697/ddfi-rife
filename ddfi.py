@@ -28,6 +28,10 @@ parser.add_argument('-scd',required=False,type=str,help='scene change detect met
 parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,130\n ',default='200,130')
 parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect\n ',default=None)
 parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
+parser.add_argument('-mode',required=False,type=str,help='nn runtime, "ncnn-vulkan"/"nvk" or "pytorch-cuda"/"cu", default "cu"\n ',default="nvk")
+parser.add_argument('-model',required=False,type=float,help='model version, default (and recommend) 3.1\n ',default=3.1)
+parser.add_argument('-mf',required=False,type=str,help='medium fps.\n ',default="192000,1001")
+parser.add_argument('--fp16',required=False,action=argparse.BooleanOptionalAction,help='fp16, for cuda version only.\n ',default=False)
 parser.add_argument('--be-cute',required=False,action='store_true',help='meow')
 parser.parse_args(sys.argv[1:],args)
 
@@ -56,6 +60,13 @@ threads=args.threads if args.threads else mt.cpu_count()
 if args.scd not in ['misc','mv','none']:
     raise ValueError('scd must be misc, mv or none.')
 thscd1,thscd2=args.thscd.split(',')
+
+if args.mode in ['ncnn-vulkan','nvk']:
+    if args.model not in [0,1,2]:
+        args.model=0
+else:
+    if args.model not in [1.8,2.3,2.4,3.1,3.5,3.8,4.0]:
+        args.model=3.1
 
 tmpDedup=os.path.abspath(tmpFolder+'dedup_intermedia.mkv')
 tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
@@ -97,6 +108,16 @@ def newTSgen():
 
 def vpyGen():
     scd=f'sup = core.mv.Super(clip)\nbw = core.mv.Analyse(sup,isb=True)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})' if args.scd=='mv' else 'clip = core.misc.SCDetect(clip)' if args.scd=='misc' else ''
+    interp=\
+    '''import vsrife
+clip = vsrife.RIFE(clip,scale=1,device_type='cuda',fp16={FP16},model_ver={MVer})
+clip = vsrife.RIFE(clip,scale=0.5,device_type='cuda',fp16={FP16},model_ver={MVer})
+clip = vsrife.RIFE(clip,scale=0.5,device_type='cuda',fp16={FP16},model_ver={MVer})'''.format(FP16=args.fp16,MVer=args.model) \
+    if args.mode in ['pytorch-cuda','cu'] else \
+    '''clip = core.rife.RIFE(clip,model={MVer},sc=True)
+clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)
+clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(args.model))
+
     script='''import vapoursynth as vs
 from vapoursynth import core
 core.num_threads=%d
@@ -105,17 +126,15 @@ clip = core.raws.Source(r\"-\")
 clip = core.std.AssumeFPS(clip,fpsnum=10,fpsden=1)
 %s
 clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)
-clip = core.rife.RIFE(clip,model=0,sc=True)
-clip = core.rife.RIFE(clip,model=0,sc=True,uhd=True)
-clip = core.rife.RIFE(clip,model=0,sc=True,uhd=True)
+%s
 clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1)
-clip = core.vfrtocfr.VFRToCFR(clip,r"%s",192000,1001,True)
+clip = core.vfrtocfr.VFRToCFR(clip,r"%s",%s,True)
 sup = core.mv.Super(clip)
 fw = core.mv.Analyse(sup)
 bw = core.mv.Analyse(sup,isb=True)
 clip = core.mv.FlowFPS(clip,sup,bw,fw,60,1)
 clip.set_output()
-''' % (threads,args.maxmem,scd,tmpTSV2N)
+''' % (threads,args.maxmem,scd,interp,tmpTSV2N,args.mf)
 
     vpy=open(f'{tmpFolder}interpX8.vpy','w',encoding='utf-8')
     print(script,file=vpy)
@@ -123,17 +142,17 @@ clip.set_output()
 
 if not os.path.exists(inFile):
     print('input file isn\'t exist')
-    exit()
+    sys.exit()
 if os.path.exists(outFile):
     if input('output file exists, continue? (y/n) ')=='y':
         pass
     else:
-        exit()
+        sys.exit()
 if os.path.exists(tmpFolder):
     if input('temp folder exists, continue? (y/n) ')=='y':
         pass
     else:
-        exit()
+        sys.exit()
 else:
     os.mkdir(tmpFolder)
 
@@ -145,6 +164,6 @@ if not os.path.exists(tmpDedup):
 
 newTSgen()
 vpyGen()
-cmdinterp=f'\"{ffpath}ffmpeg.exe\" -loglevel 0 {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate={mpdopts},setpts=N/(30*TB) -map 0:v:0 -r 30 -pix_fmt yuv420p10le -strict -1 -f yuv4mpegpipe - | \"{vspipepath}vspipe.exe\" -y \"{tmpFolder}interpX8.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpDedup}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
+cmdinterp=f'\"{ffpath}ffmpeg.exe\" -loglevel 0 {ffss} {ffto} -i \"{inFile}\" -vf mpdecimate={mpdopts},setpts=N/(30*TB) -map 0:v:0 -r 30 -pix_fmt yuv420p10le -strict -1 -f yuv4mpegpipe - | \"{vspipepath}vspipe.exe\" -c y4m \"{tmpFolder}interpX8.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpDedup}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
 print(cmdinterp)
 subprocess.run(cmdinterp,shell=True)
