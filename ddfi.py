@@ -28,7 +28,7 @@ parser.add_argument('-scd',required=False,type=str,help='scene change detect met
 parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,130\n ',default='200,130')
 parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect\n ',default=None)
 parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
-parser.add_argument('-mode',required=False,type=str,help='nn runtime, "ncnn-vulkan"/"nvk" or "pytorch-cuda"/"cu", default "cu"\n ',default="nvk")
+parser.add_argument('-mode',required=False,type=str,help='nn runtime, "ncnn-vulkan"/"nvk" or "pytorch-cuda"/"cu", default "nvk"\n ',default="nvk")
 parser.add_argument('-model',required=False,type=float,help='model version, default (and recommend) 3.1\n ',default=3.1)
 parser.add_argument('-mf',required=False,type=str,help='medium fps.\n ',default="192000,1001")
 parser.add_argument('--fp16',required=False,action=argparse.BooleanOptionalAction,help='fp16, for cuda version only.\n ',default=False)
