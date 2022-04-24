@@ -29,11 +29,13 @@ parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.S
 parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect\n ',default=None)
 parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
 parser.add_argument('-mode',required=False,type=str,help='nn runtime, "ncnn-vulkan"/"nvk" or "pytorch-cuda"/"cu", default "nvk"\n ',default="nvk")
-parser.add_argument('-model',required=False,type=float,help='model version, default (and recommend) 3.1\n ',default=3.1)
+parser.add_argument('-model',required=False,type=float,help='model version, default 2.3\n ',default=2.3)
 parser.add_argument('-mf',required=False,type=str,help='medium fps.\n ',default="192000,1001")
 parser.add_argument('--fp16',required=False,action=argparse.BooleanOptionalAction,help='fp16, for cuda version only.\n ',default=False)
 parser.add_argument('--be-cute',required=False,action='store_true',help='meow')
 parser.parse_args(sys.argv[1:],args)
+
+args.mode="nvk"
 
 inFile=args.input
 if args.be_cute:
@@ -63,8 +65,11 @@ if args.scd not in ['misc','mv','none']:
 thscd1,thscd2=args.thscd.split(',')
 
 if args.mode in ['ncnn-vulkan','nvk']:
-    if args.model not in [0,1,2]:
-        args.model=0
+    model_ver_nkv={2:4,2.3:5,2.4:6,3.0:7,3.1:8,4:9}
+    if args.model in model_ver_nkv:
+        args.model = model_ver_nkv[args.model]
+    else:
+        args.model=9
 else:
     if args.model not in [1.8,2.3,2.4,3.1,3.5,3.8,4.0]:
         args.model=3.1
@@ -125,7 +130,9 @@ clip = vsrife.RIFE(clip,scale=0.5,device_type='cuda',fp16={FP16},model_ver={MVer
     if args.mode in ['pytorch-cuda','cu'] else \
     '''clip = core.rife.RIFE(clip,model={MVer},sc=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)
-clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(args.model))
+clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(args.model)) \
+    if args.mode in ['ncnn-vulkan','nvk'] and args.model!=9 else \
+    '''clip = core.rife.RIFE(clip,model=9,sc=True,multiplier=8)'''
 
     script='''import vapoursynth as vs
 from vapoursynth import core
