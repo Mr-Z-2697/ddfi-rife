@@ -1,8 +1,6 @@
-from concurrent.futures import process
 import os,sys
 import argparse
 import subprocess
-from xml.etree.ElementTree import ProcessingInstruction
 try:
     import psutil as mt
 except ModuleNotFoundError:
