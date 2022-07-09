@@ -182,7 +182,7 @@ else:
     os.mkdir(tmpFolder)
 
 if not os.path.exists(tmpV):
-    ff_intermedia=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -map 0:v:0 {ffau} {clo} -c:a flac -c:v copy -y \"{tmpFolder}cut.mkv\"'
+    ff_intermedia=f'\"{ffpath}ffmpeg.exe\" -i \"{inFile}\" {ffss} {ffto} -map 0:v:0 {ffau} {clo} -c:a flac -c:v copy -y \"{tmpFolder}cut.mkv\"'
     print(ff_intermedia)
     subprocess.run(ff_intermedia,shell=True)
     os.rename(f'{tmpFolder}cut.mkv',tmpV)
