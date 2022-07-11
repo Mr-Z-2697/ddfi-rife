@@ -149,7 +149,8 @@ with open(r"framestodelete.txt","r") as f:
 clip = core.ffms2.Source(r"%s",cachefile="ffindex")
 clip = core.std.DeleteFrames(clip,dels)
 %s
-clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)
+clip = core.resize.Bicubic(clip,format=vs.RGB48,matrix_in=1).fmtc.bitdepth(bits=32) #cugan and other waifu2x variants will produce terrible artifacts if feed with fp32 data output by core.resize for unknown reason
+clip = core.trt.Model(clip,r'D:\Misc\cugan-s2n0-trt-512x512.engine',use_cuda_graph=True)
 %s
 clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type='error_diffusion')
 clip = core.vfrtocfr.VFRToCFR(clip,r"tsv2nX8.txt",%s,True)
