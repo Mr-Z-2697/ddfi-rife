@@ -80,6 +80,7 @@ def processInfo():
         lines[i][2]=float(lines[i][2])
         lines[i][3]=int(lines[i][3])
     lines.sort()
+    startpts=lines[0][1]
     dels=open(tmpFolder+'framestodelete.txt','w')
     tsv2o=open(tmpFolder+'tsv2o.txt','w')
     print('#timestamp format v2',file=tsv2o)
@@ -91,7 +92,7 @@ def processInfo():
             print(l[0],file=dels)
         else:
             consecutive=0
-            print(l[1],file=tsv2o)
+            print(l[1]-startpts,file=tsv2o)
     dels.close()
     tsv2o.close()
 
@@ -128,7 +129,7 @@ offs1 = core.std.MakeDiff(offs1,clip)
 offs1 = core.fmtc.bitdepth(offs1,bits=16)
 offs1 = core.std.Expr(offs1,'x 32768 - abs')
 offs1 = core.std.PlaneStats(offs1)
-offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax'],output='infos.txt',titles=[])
+offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax'],output='infos_running.txt',titles=[])
 offs1.set_output()''' % (threads,args.maxmem,tmpV)
 
     scd=f'sup = core.mv.Super(clip,pel=1,levels=1)\nbw = core.mv.Analyse(sup,isb=True,levels=1,truemotion=False)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})' if args.scd=='mv' else 'clip = core.misc.SCDetect(clip)' if args.scd=='misc' else ''
@@ -150,7 +151,7 @@ clip = core.std.DeleteFrames(clip,dels)
 %s
 clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)
 %s
-clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1)
+clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type='error_diffusion')
 clip = core.vfrtocfr.VFRToCFR(clip,r"tsv2nX8.txt",%s,True)
 sup = core.mv.Super(clip)
 fw = core.mv.Analyse(sup)
@@ -188,8 +189,13 @@ if not os.path.exists(tmpV):
     os.rename(f'{tmpFolder}cut.mkv',tmpV)
 
 vpyGen()
-print('calculating ssim.')
-subprocess.run(f'\"{vspipepath}vspipe.exe\" \"{tmpFolder}parse.vpy\" -p .')
+if not os.path.exists(tmpFolder+'infos.txt'):
+    print('calculating ssim.')
+    parse=subprocess.run(f'\"{vspipepath}vspipe.exe\" \"{tmpFolder}parse.vpy\" -p .',shell=True)
+    if parse.returncode==0:
+        os.rename(tmpFolder+'infos_running.txt',tmpFolder+'infos.txt')
+    else:
+        raise RuntimeError('ssim parsing filed, please tyr again.')
 processInfo()
 newTSgen()
 cmdinterp=f'\"{vspipepath}vspipe.exe\" -c y4m \"{tmpFolder}interpX8.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
