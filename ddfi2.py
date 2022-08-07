@@ -138,7 +138,7 @@ offs1.set_output()''' % (threads,args.maxmem,tmpV)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(args.model)) \
     if args.model!=9 else \
-    '''clip = core.rife.RIFE(clip,model=9,sc=True,multiplier=8)'''
+    '''clip = core.rife.RIFE(clip,model=9,sc=True,factor_num=8,factor_den=1)'''
 
     script='''import vapoursynth as vs
 core=vs.core
