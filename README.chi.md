@@ -19,11 +19,6 @@
 
 https://user-images.githubusercontent.com/74594146/142829178-ff08b96f-9ca7-45ab-82f0-4e95be045f2d.mp4
 
-上: 此脚本 (svp版) | 下: 直接svp
-
-![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/ddfi.webp?raw=true)
-![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/simp.webp?raw=true)
-
 ## 缺点:
 更多可见瑕疵
 
