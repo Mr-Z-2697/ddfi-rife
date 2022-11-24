@@ -20,11 +20,6 @@ left: this script(rife ver.) | right: use rife directly (2-pass, with mvtools to
 
 https://user-images.githubusercontent.com/74594146/142829178-ff08b96f-9ca7-45ab-82f0-4e95be045f2d.mp4
 
-a: this script(svp ver.) | b: use svp directly
-
-![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/ddfi.webp?raw=true)
-![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/simp.webp?raw=true)
-
 ## Downsides:
 more visible artifacts
 
