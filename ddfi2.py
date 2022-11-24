@@ -28,6 +28,7 @@ parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.S
 parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect\n ',default=None)
 parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
 parser.add_argument('-model',required=False,type=float,help='model version, default 4.0\n ',default=4.0)
+parser.add_argument('--slower-model',required=False,action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('-mf',required=False,type=str,help='medium fps.\n ',default="192000,1001")
 parser.parse_args(sys.argv[1:],args)
 
@@ -58,11 +59,25 @@ if args.scd not in ['misc','mv','none']:
     raise ValueError('scd must be misc, mv or none.')
 thscd1,thscd2=args.thscd.split(',')
 
-model_ver_nkv={2:4,2.3:5,2.4:6,3.0:7,3.1:8,4:9}
+model_ver_nkv={2: 4,
+               2.3: 5,
+               2.4: 6,
+               3.0: 7,
+               3.1: 8,
+               4: 9,
+               4.1: 11,
+               4.2: 13,
+               4.3: 15,
+               4.4: 17,
+               4.5: 19,
+               4.6: 21}
 if args.model in model_ver_nkv:
     args.model = model_ver_nkv[args.model]
 else:
     args.model=9
+    
+if args.model>=9:
+    args.model+=args.slower_model
 
 tmpV=os.path.abspath(tmpFolder+'_tmp.mkv') if args.start_time!=None or args.end_time!=None else inFile
 tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
@@ -183,7 +198,7 @@ else:
     os.mkdir(tmpFolder)
 
 if not os.path.exists(tmpV):
-    ff_intermedia=f'\"{ffpath}ffmpeg.exe\" -i \"{inFile}\" {ffss} {ffto} -map 0:v:0 {ffau} {clo} -c:a flac -c:v copy -y \"{tmpFolder}cut.mkv\"'
+    ff_intermedia=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -map 0:v:0 {ffau} {clo} -c:a flac -c:v copy -y \"{tmpFolder}cut.mkv\"'
     print(ff_intermedia)
     subprocess.run(ff_intermedia,shell=True)
     os.rename(f'{tmpFolder}cut.mkv',tmpV)
