@@ -12,7 +12,7 @@
 *(对，基本上除了计算新timestamps的部分以外就只是自动执行命令行)*
 
 ## 用法:
-运行 `ddfi2.py -h` 查看详细
+运行 `ddfi2.py -h` 或 `python ddfi2.py -h` 查看详细
 
 ## 例子:
 左：此脚本 (rife版) | 右：直接rife (两次，配合mvtools以达到24->96->60)
