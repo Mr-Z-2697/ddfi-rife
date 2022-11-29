@@ -13,7 +13,7 @@ A clumsy video auto duplication remove and frame interpolate script (mainly for 
 *(yeah, its basically just simply excuting commands automatically except new-timestamps calculating part)*
 
 ## Usage:
-run `ddfi2.py -h` for detail
+run `ddfi2.py -h` or `python ddfi2.py -h` for detail
 
 ## Example:
 left: this script(rife ver.) | right: use rife directly (2-pass, with mvtools to make 24->96->60)
