@@ -27,8 +27,12 @@ parser.add_argument('-scd',required=False,type=str,help='scene change detect met
 parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,85\n ',default='200,85')
 parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect\n ',default=None)
 parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
-parser.add_argument('-model',required=False,type=float,help='model version, default 4.0\n ',default=4.0)
-parser.add_argument('--slower-model',required=False,action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('-model',required=False,type=float,help='model version, default 4.6\n ',default=4.6)
+parser.add_argument('--slower-model',required=False,help='use ensemble model, only affects ncnn-vulkan',action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt',action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT',default='TRT')
+parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2',default=2)
+parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('-mf',required=False,type=str,help='medium fps.\n ',default="192000,1001")
 parser.parse_args(sys.argv[1:],args)
 
@@ -59,7 +63,7 @@ if args.scd not in ['misc','mv','none']:
     raise ValueError('scd must be misc, mv or none.')
 thscd1,thscd2=args.thscd.split(',')
 
-model_ver_nkv={2: 4,
+model_ver_nvk={2: 4,
                2.3: 5,
                2.4: 6,
                3.0: 7,
@@ -71,13 +75,27 @@ model_ver_nkv={2: 4,
                4.4: 17,
                4.5: 19,
                4.6: 21}
-if args.model in model_ver_nkv:
-    args.model = model_ver_nkv[args.model]
+model_ver_mlrt={4:40,
+                4.2:42,
+                4.3:43,
+                4.4:44,
+                4.5:45,
+                4.6:46}
+if not args.vs_mlrt:
+    if args.model in model_ver_nvk:
+        args.model = model_ver_nvk[args.model]
+    else:
+        args.model=21
+
+    if args.model>=9:
+        args.model+=args.slower_model
 else:
-    args.model=9
-    
-if args.model>=9:
-    args.model+=args.slower_model
+    if args.model in model_ver_mlrt:
+        args.model = model_ver_mlrt[args.model]
+    elif args.model in model_ver_mlrt.values():
+        pass
+    else:
+        args.model = 46
 
 tmpV=os.path.abspath(tmpFolder+'_tmp.mkv') if args.start_time!=None or args.end_time!=None else inFile
 tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
@@ -148,12 +166,23 @@ offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax']
 offs1.set_output()''' % (threads,args.maxmem,tmpV)
 
     scd=f'sup = core.mv.Super(clip,pel=1,levels=1)\nbw = core.mv.Analyse(sup,isb=True,levels=1,truemotion=False)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})' if args.scd=='mv' else 'clip = core.misc.SCDetect(clip)' if args.scd=='misc' else ''
-    interp=\
-    '''clip = core.rife.RIFE(clip,model={MVer},sc=True)
+
+    if not args.vs_mlrt:
+        interp=\
+            '''clip = core.rife.RIFE(clip,model={MVer},sc=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(args.model)) \
-    if args.model!=9 else \
-    '''clip = core.rife.RIFE(clip,model=9,sc=True,factor_num=8,factor_den=1)'''
+        if args.model<9 else \
+            '''clip = core.rife.RIFE(clip,model=9,sc=True,factor_num=8,factor_den=1)'''
+    else:
+        interp=\
+            '''from vsmlrt import RIFE,Backend
+from math import ceil
+pad_w = ceil(clip.width/32)*32 - clip.width
+pad_h = ceil(clip.height/32)*32 - clip.height
+clip = core.std.AddBorders(clip,right=pad_w,bottom=pad_h)
+clip = RIFE(clip,model={MVer},multi=8,backend=Backend.{BE}(num_streams={NS},fp16={FP16}))
+clip = core.std.Crop(clip,right=pad_w,bottom=pad_h)'''.format(MVer=int(args.model),BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16)
 
     script='''import vapoursynth as vs
 core=vs.core
@@ -166,7 +195,7 @@ clip = core.std.DeleteFrames(clip,dels)
 %s
 clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)
 %s
-clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type='error_diffusion')
+clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type='ordered')
 clip = core.vfrtocfr.VFRToCFR(clip,r"tsv2nX8.txt",%s,True)
 sup = core.mv.Super(clip)
 fw = core.mv.Analyse(sup)
