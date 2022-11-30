@@ -25,7 +25,7 @@ parser.add_argument('-ddt','--dedup_thresholds',required=False,type=str,help='ss
 parser.add_argument('--ffmpeg_params_output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1 -map_chapters -1\"\n ')
 parser.add_argument('-scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\" or \"none\", default mv\n ',default='mv')
 parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,85\n ',default='200,85')
-parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect\n ',default=None)
+parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect (half of your total threads)\n ',default=None)
 parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
 parser.add_argument('-model',required=False,type=float,help='model version, default 4.6\n ',default=4.6)
 parser.add_argument('--slower-model',required=False,help='use ensemble model, only affects ncnn-vulkan',action=argparse.BooleanOptionalAction,default=False)
@@ -41,6 +41,8 @@ inFile=args.input
 outFile=os.path.splitext(inFile)[0]+'_interp.mkv' if args.output is None else args.output
 tmpFolder=os.path.splitext(outFile)[0]+'_tmp\\' if args.temp_folder is None else args.temp_folder+'\\'
 #tmpFolder+='\\' if tmpFolder[-1] is not '\\' else ''
+
+inFile,outFile,tmpFolder=map(os.path.abspath,(inFile,outFile,tmpFolder))
 
 ffss='' if args.start_time is None else f'-ss {args.start_time}'
 ffto='' if args.end_time is None else f'-to {args.end_time}'
@@ -239,7 +241,7 @@ if not os.path.exists(tmpFolder+'infos.txt'):
     if parse.returncode==0:
         os.rename(tmpFolder+'infos_running.txt',tmpFolder+'infos.txt')
     else:
-        raise RuntimeError('ssim parsing filed, please tyr again.')
+        raise RuntimeError('ssim parsing failed, please try again.')
 processInfo()
 newTSgen()
 cmdinterp=f'\"{vspipepath}vspipe.exe\" -c y4m \"{tmpFolder}interpX8.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
