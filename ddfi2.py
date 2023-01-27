@@ -39,10 +39,10 @@ parser.parse_args(sys.argv[1:],args)
 
 inFile=args.input
 outFile=os.path.splitext(inFile)[0]+'_interp.mkv' if args.output is None else args.output
-tmpFolder=os.path.splitext(outFile)[0]+'_tmp\\' if args.temp_folder is None else args.temp_folder+'\\'
-#tmpFolder+='\\' if tmpFolder[-1] is not '\\' else ''
+tmpFolder=os.path.splitext(outFile)[0]+'_tmp' if args.temp_folder is None else args.temp_folder
 
 inFile,outFile,tmpFolder=map(os.path.abspath,(inFile,outFile,tmpFolder))
+tmpFolder+='\\' if tmpFolder[-1] != '\\' else ''
 
 ffss='' if args.start_time is None else f'-ss {args.start_time}'
 ffto='' if args.end_time is None else f'-to {args.end_time}'
@@ -153,10 +153,10 @@ def newTSgen():
 def vpyGen():
     script_parse='''import vapoursynth as vs
 core=vs.core
-core.num_threads=%d
-core.max_cache_size=%d
+core.num_threads={NT}
+core.max_cache_size={MCS}
 import xvs
-clip = core.ffms2.Source(r"%s",cachefile="ffindex")
+clip = core.ffms2.Source(r"{SRC}",cachefile="ffindex")
 offs1 = core.std.BlankClip(clip,length=1)+clip[:-1]
 offs1 = core.std.CopyFrameProps(offs1,clip)
 offs1 = core.vmaf.Metric(clip,offs1,2)
@@ -165,7 +165,7 @@ offs1 = core.fmtc.bitdepth(offs1,bits=16)
 offs1 = core.std.Expr(offs1,'x 32768 - abs')
 offs1 = core.std.PlaneStats(offs1)
 offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax'],output='infos_running.txt',titles=[])
-offs1.set_output()''' % (threads,args.maxmem,tmpV)
+offs1.set_output()'''.format(NT=threads,MCS=args.maxmem,SRC=tmpV)
 
     scd=f'sup = core.mv.Super(clip,pel=1,levels=1)\nbw = core.mv.Analyse(sup,isb=True,levels=1,truemotion=False)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})' if args.scd=='mv' else 'clip = core.misc.SCDetect(clip)' if args.scd=='misc' else ''
 
@@ -180,31 +180,35 @@ clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(arg
         interp=\
             '''from vsmlrt import RIFE,Backend
 from math import ceil
-pad_w = ceil(clip.width/32)*32 - clip.width
-pad_h = ceil(clip.height/32)*32 - clip.height
-clip = core.std.AddBorders(clip,right=pad_w,bottom=pad_h)
-clip = RIFE(clip,model={MVer},multi=8,backend=Backend.{BE}(num_streams={NS},fp16={FP16}))
-clip = core.std.Crop(clip,right=pad_w,bottom=pad_h)'''.format(MVer=int(args.model),BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16)
+src_w = clip.width
+src_h = clip.height
+pad_w = ceil(src_w/32)*32
+pad_h = ceil(src_h/32)*32
+clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=1,format=vs.RGB{HS})
+clip = RIFE(clip,model={MVer},multi=8,backend=Backend.{BE}(num_streams={NS},fp16={FP16},output_format={OF}))
+clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=1,format=vs.YUV420P10)'''.format(MVer=int(args.model),BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OF=int(args.mlrt_fp16))
 
     script='''import vapoursynth as vs
 core=vs.core
-core.num_threads=%d
-core.max_cache_size=%d
+core.num_threads={NT}
+core.max_cache_size={MCS}
 with open(r"framestodelete.txt","r") as f:
     dels=[int(i) for i in f]
-clip = core.ffms2.Source(r"%s",cachefile="ffindex")
+clip = core.ffms2.Source(r"{SRC}",cachefile="ffindex")
 clip = core.std.DeleteFrames(clip,dels)
-%s
-clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)
-%s
-clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type='ordered')
-clip = core.vfrtocfr.VFRToCFR(clip,r"tsv2nX8.txt",%s,True)
+{SCD}
+{TORGB}
+{INT}
+{TOYUV}
+clip = core.vfrtocfr.VFRToCFR(clip,r"tsv2nX8.txt",{MF},True)
 sup = core.mv.Super(clip)
 fw = core.mv.Analyse(sup)
 bw = core.mv.Analyse(sup,isb=True)
 clip = core.mv.FlowFPS(clip,sup,bw,fw,60,1)
 clip.set_output()
-''' % (threads,args.maxmem,tmpV,scd,interp,args.mf)
+'''.format(NT=threads,MCS=args.maxmem,SRC=tmpV,SCD=scd,INT=interp,MF=args.mf,
+TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)' if not args.vs_mlrt else '',
+TOYUV='clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type="ordered")' if not args.vs_mlrt else '')
 
     with open(f'{tmpFolder}parse.vpy','w',encoding='utf-8') as vpy:
         print(script_parse,file=vpy)
