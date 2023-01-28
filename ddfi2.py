@@ -34,6 +34,7 @@ parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt
 parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2',default=2)
 parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('-mf',required=False,type=str,help='medium fps.\n ',default="192000,1001")
+parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down',action=argparse.BooleanOptionalAction,default=True)
 parser.parse_args(sys.argv[1:],args)
 
 
@@ -201,14 +202,15 @@ clip = core.std.DeleteFrames(clip,dels)
 {INT}
 {TOYUV}
 clip = core.vfrtocfr.VFRToCFR(clip,r"tsv2nX8.txt",{MF},True)
-sup = core.mv.Super(clip)
-fw = core.mv.Analyse(sup)
-bw = core.mv.Analyse(sup,isb=True)
-clip = core.mv.FlowFPS(clip,sup,bw,fw,60,1)
+sup = core.mv.Super(clip){FAST}
+fw = core.mv.Analyse(sup){FAST}
+bw = core.mv.Analyse(sup,isb=True){FAST}
+clip = core.mv.{XFPS}(clip,sup,bw,fw,60,1)
 clip.set_output()
 '''.format(NT=threads,MCS=args.maxmem,SRC=tmpV,SCD=scd,INT=interp,MF=args.mf,
 TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)' if not args.vs_mlrt else '',
-TOYUV='clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type="ordered")' if not args.vs_mlrt else '')
+TOYUV='clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type="ordered")' if not args.vs_mlrt else '',
+FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',XFPS='BlockFPS' if args.fast_fps_convert_down else 'FlowFPS')
 
     with open(f'{tmpFolder}parse.vpy','w',encoding='utf-8') as vpy:
         print(script_parse,file=vpy)
