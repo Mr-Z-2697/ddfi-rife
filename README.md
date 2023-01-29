@@ -24,6 +24,6 @@ https://user-images.githubusercontent.com/74594146/142829178-ff08b96f-9ca7-45ab-
 more visible artifacts
 
 rife ver.:
-![IMG](https://user-images.githubusercontent.com/74594146/142829294-1b17c073-f587-4e49-8a72-c3c8b4149a53.png)
+![IMG](example/artifacts2.webp)
 svp ver.:
-![IMG](https://github.com/Mr-Z-2697/ddfi/blob/main/example/artifacts.webp?raw=true)
+![IMG](example/artifacts.webp)
