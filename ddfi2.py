@@ -28,13 +28,14 @@ parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.S
 parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect (half of your total threads)\n ',default=None)
 parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
 parser.add_argument('-model',required=False,type=float,help='model version, default 4.6\n ',default=4.6)
-parser.add_argument('--slower-model',required=False,help='use ensemble model, only affects ncnn-vulkan',action=argparse.BooleanOptionalAction,default=False)
-parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt',action=argparse.BooleanOptionalAction,default=False)
-parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT',default='TRT')
-parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2',default=2)
-parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not',action=argparse.BooleanOptionalAction,default=True)
-parser.add_argument('-mf',required=False,type=str,help='medium fps.\n ',default="192000,1001")
-parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('--slower-model',required=False,help='use ensemble model, only affects ncnn-vulkan\n ',action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt\n ',action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT\n ',default='TRT')
+parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2\n ',default=2)
+parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not\n ',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('-mf',required=False,type=str,help='medium fps, default 192000,1001\n ',default="192000,1001")
+parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down\n ',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('--skip-encode',required=False,help='skip final output encoding, hence you can do it yourself or even play it directly\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.parse_args(sys.argv[1:],args)
 
 
@@ -252,4 +253,5 @@ processInfo()
 newTSgen()
 cmdinterp=f'\"{vspipepath}vspipe.exe\" -c y4m \"{tmpFolder}interpX8.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
 print(cmdinterp)
-subprocess.run(cmdinterp,shell=True)
+if not args.skip_encode:
+    subprocess.run(cmdinterp,shell=True)
