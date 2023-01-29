@@ -36,6 +36,7 @@ parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or no
 parser.add_argument('-mf',required=False,type=str,help='medium fps, default 192000,1001\n ',default="192000,1001")
 parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down\n ',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('--skip-encode',required=False,help='skip final output encoding, hence you can do it yourself or even play it directly\n ',action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('--half-ssim',required=False,help='use 0.5x frame for ssim calculation, for speed\n ',action=argparse.BooleanOptionalAction,default=True)
 parser.parse_args(sys.argv[1:],args)
 
 
@@ -158,6 +159,27 @@ core=vs.core
 core.num_threads={NT}
 core.max_cache_size={MCS}
 import xvs
+from math import floor
+clip = core.ffms2.Source(r"{SRC}",cachefile="ffindex")
+halfw,halfh = floor(clip.width/4)*2,floor(clip.height/4)*2
+clip1 = core.resize.Bilinear(clip,halfw,halfh)
+offs1 = core.std.BlankClip(clip1,length=1)+clip1[:-1]
+offs1 = core.std.CopyFrameProps(offs1,clip1)
+ssim = core.vmaf.Metric(clip1,offs1,2)
+offs1 = core.std.BlankClip(clip,length=1)+clip[:-1]
+offs1 = core.std.CopyFrameProps(offs1,ssim)
+offs1 = core.std.MakeDiff(offs1,clip)
+offs1 = core.fmtc.bitdepth(offs1,bits=16)
+offs1 = core.std.Expr(offs1,'x 32768 - abs')
+offs1 = core.std.PlaneStats(offs1)
+offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax'],output='infos_running.txt',titles=[])
+offs1.set_output()''' \
+    if args.half_ssim else \
+        '''import vapoursynth as vs
+core=vs.core
+core.num_threads={NT}
+core.max_cache_size={MCS}
+import xvs
 clip = core.ffms2.Source(r"{SRC}",cachefile="ffindex")
 offs1 = core.std.BlankClip(clip,length=1)+clip[:-1]
 offs1 = core.std.CopyFrameProps(offs1,clip)
@@ -167,7 +189,8 @@ offs1 = core.fmtc.bitdepth(offs1,bits=16)
 offs1 = core.std.Expr(offs1,'x 32768 - abs')
 offs1 = core.std.PlaneStats(offs1)
 offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax'],output='infos_running.txt',titles=[])
-offs1.set_output()'''.format(NT=threads,MCS=args.maxmem,SRC=tmpV)
+offs1.set_output()'''
+    script_parse=script_parse.format(NT=threads,MCS=args.maxmem,SRC=tmpV)
 
     scd=f'sup = core.mv.Super(clip,pel=1,levels=1)\nbw = core.mv.Analyse(sup,isb=True,levels=1,truemotion=False)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})' if args.scd=='mv' else 'clip = core.misc.SCDetect(clip)' if args.scd=='misc' else ''
 
