@@ -52,7 +52,7 @@ ffto='' if args.end_time is None else f'-to {args.end_time}'
 ffau='-an' if args.audio_stream == 'no' else f'-map a:{args.audio_stream}'
 ffau2='-an' if args.audio_stream == 'no' else f'-map 1:a:0'
 crfo=18 if args.output_crf is None else args.output_crf
-x265_default='-c:v libx265 -preset 6 -x265-params sao=0:rect=0:strong-intra-smoothing=0:open-gop=0:b-intra=1:weightb=1:aq-mode=1:aq-strength=0.8:ctu=32:rc-lookahead=60:me=hex:subme=2'
+x265_default='-c:v libx265 -preset 6 -x265-params sao=0:rect=0:strong-intra-smoothing=0:open-gop=0:aq-mode=1:aq-strength=0.8:ctu=32:rc-lookahead=60:me=hex:subme=2'
 codecov=x265_default if args.video_codec is None else x265_default+':'+args.video_codec[1:] if args.video_codec[0]=='+' else f'-c:v {args.video_codec}'
 codecoa='-c:a libopus' if args.audio_codec is None else f'-c:a {args.audio_codec}'
 clo='-channel_layout stereo' if args.audio_channel_layout is None else f'-channel_layout {args.audio_channel_layout}'
@@ -73,13 +73,15 @@ model_ver_nvk={2: 4,
                2.4: 6,
                3.0: 7,
                3.1: 8,
-               4: 9,
+               4.0: 9,
                4.1: 11,
                4.2: 13,
                4.3: 15,
                4.4: 17,
                4.5: 19,
-               4.6: 21}
+               4.6: 21,
+               4.7: 23,
+               4.8: 24}
 model_ver_mlrt={4:40,
                 4.2:42,
                 4.3:43,
@@ -92,9 +94,9 @@ if not args.vs_mlrt:
     if args.model in model_ver_nvk:
         args.model = model_ver_nvk[args.model]
     else:
-        args.model=21
+        args.model=24
 
-    if args.model>=9:
+    if args.model>=9 and args.model<23:
         args.model+=args.slower_model
 else:
     if args.model in model_ver_mlrt:
@@ -202,7 +204,7 @@ offs1.set_output()'''
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(args.model)) \
         if args.model<9 else \
-            '''clip = core.rife.RIFE(clip,model=9,sc=True,factor_num=8,factor_den=1)'''
+            '''clip = core.rife.RIFE(clip,model={MVer},sc=True,factor_num=8,factor_den=1)'''.format(MVer=int(args.model))
     else:
         interp=\
             '''from vsmlrt import RIFE,Backend
@@ -212,8 +214,8 @@ src_h = clip.height
 pad_w = ceil(src_w/32)*32
 pad_h = ceil(src_h/32)*32
 clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=1,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},ensemble={ENSE},multi=8,backend=Backend.{BE}(num_streams={NS},fp16={FP16},output_format={OF}))
-clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=1,format=vs.YUV420P10)'''.format(MVer=int(args.model),BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OF=int(args.mlrt_fp16),ENSE=args.slower_model)
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi=8,backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OF}))
+clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=1,format=vs.YUV420P10)'''.format(MVer=int(args.model),BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OF=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model)
 
     script='''import vapoursynth as vs
 core=vs.core
