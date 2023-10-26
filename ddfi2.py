@@ -9,7 +9,7 @@ toolsFolder=f'{os.path.dirname(os.path.realpath(__file__))}\\tools\\'
 sys.path.append(toolsFolder)
 class args:
     pass
-parser = argparse.ArgumentParser(description='an animation auto duplicated frame remove and frame interpolate script, uses ffmpeg, mkvextract, and vapoursynth.',formatter_class=argparse.RawTextHelpFormatter)
+parser = argparse.ArgumentParser(description='an animation auto duplicated frame remove and frame interpolate script, uses ffmpeg and vapoursynth.',formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-i','--input',required=True,type=str,help='source file, any format ffmpeg can decode\n ')
 parser.add_argument('-o','--output',required=False,type=str,help='output file, default \"input file\"_interp.mkv\n ')
 parser.add_argument('-tf','--temp_folder',required=False,type=str,help='temp folder, default \"output file\"_tmp\\\n ')
@@ -27,8 +27,8 @@ parser.add_argument('-scd',required=False,type=str,help='scene change detect met
 parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,85\n ',default='200,85')
 parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect (half of your total threads)\n ',default=None)
 parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
-parser.add_argument('-model',required=False,type=float,help='model version, default 4.6\n ',default=4.6)
-parser.add_argument('--slower-model',required=False,help='use ensemble model, only affects ncnn-vulkan\n ',action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('-model',required=False,type=float,help='model version, default 4.8\n ',default=4.8)
+parser.add_argument('--slower-model',required=False,help='use ensemble model, some model won\'t work\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT\n ',default='TRT')
 parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2\n ',default=2)
@@ -85,7 +85,9 @@ model_ver_mlrt={4:40,
                 4.3:43,
                 4.4:44,
                 4.5:45,
-                4.6:46}
+                4.6:46,
+                4.7:47,
+                4.8:48}
 if not args.vs_mlrt:
     if args.model in model_ver_nvk:
         args.model = model_ver_nvk[args.model]
@@ -100,7 +102,7 @@ else:
     elif args.model in model_ver_mlrt.values():
         pass
     else:
-        args.model = 46
+        args.model = 48
 
 tmpV=os.path.abspath(tmpFolder+'_tmp.mkv') if args.start_time!=None or args.end_time!=None else inFile
 tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
@@ -210,8 +212,8 @@ src_h = clip.height
 pad_w = ceil(src_w/32)*32
 pad_h = ceil(src_h/32)*32
 clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=1,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},multi=8,backend=Backend.{BE}(num_streams={NS},fp16={FP16},output_format={OF}))
-clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=1,format=vs.YUV420P10)'''.format(MVer=int(args.model),BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OF=int(args.mlrt_fp16))
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi=8,backend=Backend.{BE}(num_streams={NS},fp16={FP16},output_format={OF}))
+clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=1,format=vs.YUV420P10)'''.format(MVer=int(args.model),BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OF=int(args.mlrt_fp16),ENSE=args.slower_model)
 
     script='''import vapoursynth as vs
 core=vs.core
