@@ -27,7 +27,7 @@ parser.add_argument('-scd',required=False,type=str,help='scene change detect met
 parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,85\n ',default='200,85')
 parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect (half of your total threads)\n ',default=None)
 parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
-parser.add_argument('-model',required=False,type=float,help='model version, default 4.8\n ',default=4.8)
+parser.add_argument('-model',required=False,type=str,help='model version, default 4.8\n ',default='4.8')
 parser.add_argument('--slower-model',required=False,help='use ensemble model, some model won\'t work\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT\n ',default='TRT')
@@ -68,28 +68,30 @@ if args.scd not in ['misc','mv','none']:
     raise ValueError('scd must be misc, mv or none.')
 thscd1,thscd2=args.thscd.split(',')
 
-model_ver_nvk={2: 4,
-               2.3: 5,
-               2.4: 6,
-               3.0: 7,
-               3.1: 8,
-               4.0: 9,
-               4.1: 11,
-               4.2: 13,
-               4.3: 15,
-               4.4: 17,
-               4.5: 19,
-               4.6: 21,
-               4.7: 23,
-               4.8: 24}
-model_ver_mlrt={4:40,
-                4.2:42,
-                4.3:43,
-                4.4:44,
-                4.5:45,
-                4.6:46,
-                4.7:47,
-                4.8:48}
+model_ver_nvk={'2': 4,
+               '2.3': 5,
+               '2.4': 6,
+               '3.0': 7,
+               '3.1': 8,
+               '4.0': 9,
+               '4.1': 11,
+               '4.2': 13,
+               '4.3': 15,
+               '4.4': 17,
+               '4.5': 19,
+               '4.6': 21,
+               '4.7': 23,
+               '4.8': 24}
+model_ver_mlrt={'4':40,
+                '4.2':42,
+                '4.3':43,
+                '4.4':44,
+                '4.5':45,
+                '4.6':46,
+                '4.7':47,
+                '4.8':48,
+                '4.9':49,
+                '4.10':410}
 if not args.vs_mlrt:
     if args.model in model_ver_nvk:
         args.model = model_ver_nvk[args.model]
