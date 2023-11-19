@@ -1,10 +1,7 @@
 import os,sys
 import argparse
 import subprocess
-try:
-    import psutil as mt
-except ModuleNotFoundError:
-    import multiprocessing as mt
+
 toolsFolder=f'{os.path.dirname(os.path.realpath(__file__))}\\tools\\'
 sys.path.append(toolsFolder)
 class args:
@@ -12,28 +9,28 @@ class args:
 parser = argparse.ArgumentParser(description='an animation auto duplicated frame remove and frame interpolate script, uses ffmpeg and vapoursynth.',formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-i','--input',required=True,type=str,help='source file, any format ffmpeg can decode\n ')
 parser.add_argument('-o','--output',required=False,type=str,help='output file, default \"input file\"_interp.mkv\n ')
-parser.add_argument('-tf','--temp_folder',required=False,type=str,help='temp folder, default \"output file\"_tmp\\\n ')
-parser.add_argument('-st','--start_time',required=False,type=str,help='cut input video start from this time, format h:mm:ss.nnn or seconds\n ')
-parser.add_argument('-et','--end_time',required=False,type=str,help='cut input video end at this time, format h:mm:ss.nnn or seconds\n ')
-parser.add_argument('-as','--audio_stream',required=False,type=str,help='set audio stream index, starts from 0, \n\"no\" means don\'t output audio, and is the default\n ',default='no')
-parser.add_argument('-q','--output_crf',required=False,type=int,help='output video crf value, interger. if a codec don\'t has -crf option is used, \n--ffmpeg_params_output can be used as a workaround. default 18\n ')
-parser.add_argument('-vc','--video_codec',required=False,type=str,help='output video codec, use the name in ffmpeg, \nwill be constrained by output format. default libx265\n ')
-parser.add_argument('-ac','--audio_codec',required=False,type=str,help='output audio codec, similar to -vc. default libopus\n ')
-parser.add_argument('-al','--audio_channel_layout',required=False,type=str,help='output audio channel layout, \nuse the name in ffmpeg. default stereo\n ')
-parser.add_argument('-ab','--audio_bitrate',required=False,type=str,help='output audio bitrate, use it like in ffmpeg. default 128k\n ')
-parser.add_argument('-ddt','--dedup_thresholds',required=False,type=str,help='ssim, max pixel diff (16 bits scale) and max consecutive deletion, inclusive. \ndefault 0.999,10240,2\n ',default='0.999,10240,2')
-parser.add_argument('--ffmpeg_params_output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1 -map_chapters -1\"\n ')
-parser.add_argument('-scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\" or \"none\", default mv\n ',default='mv')
-parser.add_argument('-thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,85\n ',default='200,85')
-parser.add_argument('-threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect (half of your total threads)\n ',default=None)
-parser.add_argument('-maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
-parser.add_argument('-model',required=False,type=str,help='model version, default 4.8\n ',default='4.8')
+parser.add_argument('-tf','--temp-folder',required=False,type=str,help='temp folder, default \"output file\"_tmp\\\n ')
+parser.add_argument('-st','--start-time',required=False,type=str,help='cut input video start from this time, format h:mm:ss.nnn or seconds\n ')
+parser.add_argument('-et','--end-time',required=False,type=str,help='cut input video end at this time, format h:mm:ss.nnn or seconds\n ')
+parser.add_argument('-as','--audio-stream',required=False,type=str,help='set audio stream index, starts from 0, \n\"no\" means don\'t output audio, and is the default\n ',default='no')
+parser.add_argument('-q','--output-crf',required=False,type=int,help='output video crf value, interger. if a codec don\'t has -crf option is used, \n--ffmpeg_params_output can be used as a workaround. default 18\n ')
+parser.add_argument('-vc','--video-codec',required=False,type=str,help='output video codec, use the name in ffmpeg, \nwill be constrained by output format. default libx265\n ')
+parser.add_argument('-ac','--audio-codec',required=False,type=str,help='output audio codec, similar to -vc. default libopus\n ')
+parser.add_argument('-al','--audio-channel-layout',required=False,type=str,help='output audio channel layout, \nuse the name in ffmpeg. default stereo\n ')
+parser.add_argument('-ab','--audio-bitrate',required=False,type=str,help='output audio bitrate, use it like in ffmpeg. default 128k\n ')
+parser.add_argument('-ddt','--dedup-thresholds',required=False,type=str,help='ssim, max pixel diff (16 bits scale) and max consecutive deletion, inclusive. \ndefault 0.999,10240,2\n ',default='0.999,10240,2')
+parser.add_argument('--ffmpeg-params-output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1 -map_chapters -1\"\n ')
+parser.add_argument('--scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\" or \"none\", default mv\n ',default='mv')
+parser.add_argument('--thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,85\n ',default='200,85')
+parser.add_argument('--threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect (half of your total threads)\n ',default=None)
+parser.add_argument('--maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
+parser.add_argument('-m','--model',required=False,type=str,help='model version, default 4.8\n ',default='4.8')
 parser.add_argument('--slower-model',required=False,help='use ensemble model, some model won\'t work\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT\n ',default='TRT')
 parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2\n ',default=2)
 parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not\n ',action=argparse.BooleanOptionalAction,default=True)
-parser.add_argument('-mf',required=False,type=str,help='medium fps, default 192000,1001\n ',default="192000,1001")
+parser.add_argument('-mf','--medium-fps',required=False,type=str,help='medium fps, default 192000,1001\n ',default="192000,1001")
 parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down\n ',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('--skip-encode',required=False,help='skip final output encoding, hence you can do it yourself or even play it directly\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--half-ssim',required=False,help='use 0.5x frame for ssim calculation, for speed\n ',action=argparse.BooleanOptionalAction,default=True)
@@ -58,7 +55,7 @@ codecoa='-c:a libopus' if args.audio_codec is None else f'-c:a {args.audio_codec
 clo='-channel_layout stereo' if args.audio_channel_layout is None else f'-channel_layout {args.audio_channel_layout}'
 abo='-b:a 128k' if args.audio_bitrate is None else f'-b:a {args.audio_bitrate}'
 ffparamo='-map_metadata -1 -map_chapters -1' if args.ffmpeg_params_output is None else args.ffmpeg_params_output
-threads=args.threads if args.threads else int(mt.cpu_count()/2)
+threads='core.num_threads//2' if args.threads is None else args.threads
 ddt=args.dedup_thresholds.split(',')
 ssimt=float(ddt[0])
 pxdifft=int(ddt[1])
@@ -83,6 +80,7 @@ model_ver_nvk={'2': 4,
                '4.7': 23,
                '4.8': 24}
 model_ver_mlrt={'4':40,
+                '4.0':40,
                 '4.2':42,
                 '4.3':43,
                 '4.4':44,
@@ -91,7 +89,10 @@ model_ver_mlrt={'4':40,
                 '4.7':47,
                 '4.8':48,
                 '4.9':49,
-                '4.10':410}
+                '4.10':410,
+                '4.11':411,
+                '4.12':412,
+                '4.12-lite':4121}
 if not args.vs_mlrt:
     if args.model in model_ver_nvk:
         args.model = model_ver_nvk[args.model]
@@ -237,7 +238,7 @@ fw = core.mv.Analyse(sup){FAST}
 bw = core.mv.Analyse(sup,isb=True){FAST}
 clip = core.mv.{XFPS}(clip,sup,bw,fw,60,1)
 clip.set_output()
-'''.format(NT=threads,MCS=args.maxmem,SRC=tmpV,SCD=scd,INT=interp,MF=args.mf,
+'''.format(NT=threads,MCS=args.maxmem,SRC=tmpV,SCD=scd,INT=interp,MF=args.medium_fps,
 TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)' if not args.vs_mlrt else '',
 TOYUV='clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type="ordered")' if not args.vs_mlrt else '',
 FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',XFPS='BlockFPS' if args.fast_fps_convert_down else 'FlowFPS')
