@@ -14,15 +14,15 @@ parser.add_argument('-st','--start-time',required=False,type=str,help='cut input
 parser.add_argument('-et','--end-time',required=False,type=str,help='cut input video end at this time, format h:mm:ss.nnn or seconds\n ')
 parser.add_argument('-as','--audio-stream',required=False,type=str,help='set audio stream index, starts from 0, \n\"no\" means don\'t output audio, and is the default\n ',default='no')
 parser.add_argument('-q','--output-crf',required=False,type=int,help='output video crf value, interger. if a codec don\'t has -crf option is used, \n--ffmpeg_params_output can be used as a workaround. default 18\n ')
-parser.add_argument('-vc','--video-codec',required=False,type=str,help='output video codec, use the name in ffmpeg, \nwill be constrained by output format. default libx265\n ')
+parser.add_argument('-vc','--video-codec',required=False,type=str,help='output video codec, use the name in ffmpeg, \nwill be constrained by output format. default libx265\nthis arg can also set extra x265-params by use prefix "+"\n(e.g. +bframes=11:qpmax=45:qpmin=14)\n ')
 parser.add_argument('-ac','--audio-codec',required=False,type=str,help='output audio codec, similar to -vc. default libopus\n ')
 parser.add_argument('-al','--audio-channel-layout',required=False,type=str,help='output audio channel layout, \nuse the name in ffmpeg. default stereo\n ')
 parser.add_argument('-ab','--audio-bitrate',required=False,type=str,help='output audio bitrate, use it like in ffmpeg. default 128k\n ')
-parser.add_argument('-ddt','--dedup-thresholds',required=False,type=str,help='ssim, max pixel diff (16 bits scale) and max consecutive deletion, inclusive. \ndefault 0.999,10240,2\n ',default='0.999,10240,2')
+parser.add_argument('-ddt','--dedup-thresholds',required=False,type=str,help='ssim, max pixel diff (16 bits and std.MakeDiff scale)\nand max consecutive deletion, inclusive. \ndefault 0.999,10240,2\n ',default='0.999,10240,2')
 parser.add_argument('--ffmpeg-params-output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1 -map_chapters -1\"\n ')
 parser.add_argument('--scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\" or \"none\", default mv\n ',default='mv')
 parser.add_argument('--thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,85\n ',default='200,85')
-parser.add_argument('--threads',required=False,type=int,help='how many threads to use in VS (core.num_threads), default auto detect (half of your total threads)\n ',default=None)
+parser.add_argument('--threads',required=False,type=int,help='how many threads to use in VS (core.num_threads),\ndefault auto detect (half of your total threads)\n ',default=None)
 parser.add_argument('--maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
 parser.add_argument('-m','--model',required=False,type=str,help='model version, default 4.8\n ',default='4.8')
 parser.add_argument('--slower-model',required=False,help='use ensemble model, some model won\'t work\n ',action=argparse.BooleanOptionalAction,default=False)
@@ -36,6 +36,7 @@ parser.add_argument('-of','--output-fps',required=False,type=str,help='output fp
 parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down\n ',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('--skip-encode',required=False,help='skip final output encoding, hence you can do it yourself or even play it directly\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--half-ssim',required=False,help='use 0.5x frame for ssim calculation, for speed\n ',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('--adjacent',required=False,type=str,help=argparse.SUPPRESS,default='')#'delete adjacent frames of duplicated frames,\nthis can break consecutive deletion limit because of my garbage code,\nconsider this as for test purpose (string of relative frames like "+1,-1")\n '
 parser.parse_args(sys.argv[1:],args)
 
 
@@ -128,20 +129,34 @@ def processInfo():
         lines[i][3]=int(lines[i][3])
     lines.sort()
     startpts=lines[0][1]
-    dels=open(tmpFolder+'framestodelete.txt','w')
-    tsv2o=open(tmpFolder+'tsv2o.txt','w')
-    print('#timestamp format v2',file=tsv2o)
+    lastframe=lines[-1][0]
     consecutive=0
+    adjacents=[int(i) for i in args.adjacent.split(',')] if args.adjacent else []
+    del_list=[]
+    tsv2_list=[]
     for i in range(len(lines)):
         l=lines[i]
-        if l[2]>=ssimt and l[3]<=pxdifft and consecutive<consecutivet:
+        if l[2]>=ssimt and l[3]<=pxdifft and consecutive<consecutivet and not l[0] in del_list:
+            if l[0]==0:
+                continue
             consecutive+=1
-            print(l[0],file=dels)
-        else:
+            del_list.append(l[0])
+            for i in adjacents:
+                fadj=l[0]+i
+                if 0<fadj<lastframe and not fadj in del_list:
+                    consecutive+=1
+                    del_list.append(fadj)
+        elif not l[0] in del_list:
             consecutive=0
-            print(l[1]-startpts,file=tsv2o)
-    dels.close()
-    tsv2o.close()
+    for i in range(len(lines)):
+            l=lines[i]
+            if not l[0] in del_list:
+                tsv2_list.append(l[1]-startpts)
+    with open(tmpFolder+'framestodelete.txt','w') as dels:
+        dels.write('\n'.join(map(str,del_list)))
+    with open(tmpFolder+'tsv2o.txt','w') as tsv2o:
+        tsv2o.write('#timestamp format v2\n')
+        tsv2o.write('\n'.join(map(str,tsv2_list)))
 
 def newTSgen():
     ts_new=list()
@@ -248,7 +263,7 @@ FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',XFPS='BlockFPS'
     with open(f'{tmpFolder}parse.vpy','w',encoding='utf-8') as vpy:
         print(script_parse,file=vpy)
 
-    with open(f'{tmpFolder}interpX8.vpy','w',encoding='utf-8') as vpy:
+    with open(f'{tmpFolder}interpX{args.multi}.vpy','w',encoding='utf-8') as vpy:
         print(script,file=vpy)
 
 if not os.path.exists(inFile):
@@ -283,7 +298,7 @@ if not os.path.exists(tmpFolder+'infos.txt'):
         raise RuntimeError('ssim parsing failed, please check your settings then try again.')
 processInfo()
 newTSgen()
-cmdinterp=f'\"{vspipepath}vspipe.exe\" -c y4m \"{tmpFolder}interpX8.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
+cmdinterp=f'\"{vspipepath}vspipe.exe\" -c y4m \"{tmpFolder}interpX{args.multi}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
 print(cmdinterp)
 if not args.skip_encode:
     subprocess.run(cmdinterp,shell=True)
