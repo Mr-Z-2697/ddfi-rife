@@ -233,9 +233,9 @@ src_w = clip.width
 src_h = clip.height
 pad_w = ceil(src_w/32)*32
 pad_h = ceil(src_h/32)*32
-clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=1,format=vs.RGB{HS})
+clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=matrix,format=vs.RGB{HS})
 clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}))
-clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=1,format=vs.YUV420P10)'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model)
+clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model)
 
     script='''import vapoursynth as vs
 core=vs.core
@@ -244,6 +244,11 @@ core.max_cache_size={MCS}
 with open(r"framestodelete.txt","r") as f:
     dels=[int(i) for i in f]
 clip = core.ffms2.Source(r"{SRC}",cachefile="ffindex")
+src_fmt=clip.format
+try:
+    matrix=clip.get_frame(0).props._Matrix
+except:
+    matrix=1
 clip = core.std.DeleteFrames(clip,dels)
 {SCD}
 {TORGB}
@@ -256,8 +261,8 @@ bw = core.mv.Analyse(sup,isb=True){FAST}
 clip = core.mv.{XFPS}(clip,sup,bw,fw,{OF})
 clip.set_output()
 '''.format(NT=threads,MCS=args.maxmem,SRC=tmpV,SCD=scd,INT=interp,MF=args.medium_fps,OF=args.output_fps,MUL=args.multi,
-TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)' if not args.vs_mlrt else '',
-TOYUV='clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type="ordered")' if not args.vs_mlrt else '',
+TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=matrix)' if not args.vs_mlrt else '',
+TOYUV='clip = core.resize.Bicubic(clip,format=src_fmt.replace(bits_per_sample=10),matrix=matrix,dither_type="ordered")' if not args.vs_mlrt else '',
 FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',XFPS='BlockFPS' if args.fast_fps_convert_down else 'FlowFPS')
 
     with open(f'{tmpFolder}parse.vpy','w',encoding='utf-8') as vpy:
