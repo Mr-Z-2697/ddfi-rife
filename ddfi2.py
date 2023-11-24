@@ -6,7 +6,7 @@ toolsFolder=f'{os.path.dirname(os.path.realpath(__file__))}\\tools\\'
 sys.path.append(toolsFolder)
 class args:
     pass
-parser = argparse.ArgumentParser(description='an animation auto duplicated frame remove and frame interpolate script, uses ffmpeg and vapoursynth.',formatter_class=argparse.RawTextHelpFormatter)
+parser = argparse.ArgumentParser(description='an video auto duplicated frame remove and frame interpolate script, uses ffmpeg and vapoursynth.',formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-i','--input',required=True,type=str,help='source file, any format ffmpeg can decode\n ')
 parser.add_argument('-o','--output',required=False,type=str,help='output file, default \"input file\"_interp.mkv\n ')
 parser.add_argument('-tf','--temp-folder',required=False,type=str,help='temp folder, default \"output file\"_tmp\\\n ')
@@ -30,7 +30,9 @@ parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt\n ',action=argp
 parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT\n ',default='TRT')
 parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2\n ',default=2)
 parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not\n ',action=argparse.BooleanOptionalAction,default=True)
-parser.add_argument('-mf','--medium-fps',required=False,type=str,help='medium fps, default 192000,1001\n ',default="192000,1001")
+parser.add_argument('--multi',required=False,type=int,help='multiple of interpolation, default 8\n ',default=8)
+parser.add_argument('-mf','--medium-fps',required=False,type=str,help='medium fps, format is "fpsnum,fpsden", default 192000,1001\n ',default="192000,1001")
+parser.add_argument('-of','--output-fps',required=False,type=str,help='output fps, format is "fpsnum,fpsden", default 60,1\n ',default="60,1")
 parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down\n ',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('--skip-encode',required=False,help='skip final output encoding, hence you can do it yourself or even play it directly\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--half-ssim',required=False,help='use 0.5x frame for ssim calculation, for speed\n ',action=argparse.BooleanOptionalAction,default=True)
@@ -111,7 +113,7 @@ else:
 
 tmpV=os.path.abspath(tmpFolder+'_tmp.mkv') if args.start_time!=None or args.end_time!=None else inFile
 tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
-tmpTSV2N=os.path.abspath(f'{tmpFolder}tsv2nX8.txt')
+tmpTSV2N=os.path.abspath(f'{tmpFolder}tsv2nX{args.multi}.txt')
 
 ffpath=mmgpath=dllpath=toolsFolder
 vspipepath=toolsFolder+'python-vapoursynth-plugins\\'
@@ -150,8 +152,8 @@ def newTSgen():
     
     for x in range(len(ts_o)-1):
         ts_new.append(str(float(ts_o[x])))
-        for i in range(1,8):
-            ts_new.append( str(float(ts_o[x]) + (float(ts_o[x+1])-float(ts_o[x]))/8*i) )
+        for i in range(1,args.multi):
+            ts_new.append( str(float(ts_o[x]) + (float(ts_o[x+1])-float(ts_o[x]))/args.multi*i) )
     #print(ts_new)
     print('#timestamp format v2',file=outfile)
     for x in range(len(ts_new)):
@@ -207,7 +209,7 @@ offs1.set_output()'''
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(args.model)) \
         if args.model<9 else \
-            '''clip = core.rife.RIFE(clip,model={MVer},sc=True,factor_num=8,factor_den=1)'''.format(MVer=int(args.model))
+            '''clip = core.rife.RIFE(clip,model={MVer},sc=True,factor_num={MUL},factor_den=1)'''.format(MVer=int(args.model),MUL=args.multi)
     else:
         interp=\
             '''from vsmlrt import RIFE,Backend
@@ -217,8 +219,8 @@ src_h = clip.height
 pad_w = ceil(src_w/32)*32
 pad_h = ceil(src_h/32)*32
 clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=1,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},ensemble={ENSE},multi=8,backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OF}))
-clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=1,format=vs.YUV420P10)'''.format(MVer=int(args.model),BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OF=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model)
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}))
+clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=1,format=vs.YUV420P10)'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model)
 
     script='''import vapoursynth as vs
 core=vs.core
@@ -232,13 +234,13 @@ clip = core.std.DeleteFrames(clip,dels)
 {TORGB}
 {INT}
 {TOYUV}
-clip = core.vfrtocfr.VFRToCFR(clip,r"tsv2nX8.txt",{MF},True)
+clip = core.vfrtocfr.VFRToCFR(clip,r"tsv2nX{MUL}.txt",{MF},True)
 sup = core.mv.Super(clip){FAST}
 fw = core.mv.Analyse(sup){FAST}
 bw = core.mv.Analyse(sup,isb=True){FAST}
-clip = core.mv.{XFPS}(clip,sup,bw,fw,60,1)
+clip = core.mv.{XFPS}(clip,sup,bw,fw,{OF})
 clip.set_output()
-'''.format(NT=threads,MCS=args.maxmem,SRC=tmpV,SCD=scd,INT=interp,MF=args.medium_fps,
+'''.format(NT=threads,MCS=args.maxmem,SRC=tmpV,SCD=scd,INT=interp,MF=args.medium_fps,OF=args.output_fps,MUL=args.multi,
 TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=1)' if not args.vs_mlrt else '',
 TOYUV='clip = core.resize.Bicubic(clip,format=vs.YUV420P10,matrix=1,dither_type="ordered")' if not args.vs_mlrt else '',
 FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',XFPS='BlockFPS' if args.fast_fps_convert_down else 'FlowFPS')
@@ -278,7 +280,7 @@ if not os.path.exists(tmpFolder+'infos.txt'):
     if parse.returncode==0:
         os.rename(tmpFolder+'infos_running.txt',tmpFolder+'infos.txt')
     else:
-        raise RuntimeError('ssim parsing failed, please try again.')
+        raise RuntimeError('ssim parsing failed, please check your settings then try again.')
 processInfo()
 newTSgen()
 cmdinterp=f'\"{vspipepath}vspipe.exe\" -c y4m \"{tmpFolder}interpX8.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
