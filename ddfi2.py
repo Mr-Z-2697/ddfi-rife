@@ -226,11 +226,11 @@ core=vs.core
 core.num_threads={NT}
 core.max_cache_size={MCS}
 import xvs
-clip = core.lsmas.LWLibavSource(r"{SRC}",cachefile="lwindex").fmtc.bitdepth(bits=16,dmode=1)
+clip = core.lsmas.LWLibavSource(r"{SRC}",cachefile="lwindex")
 offs1 = core.std.BlankClip(clip,length=1)+clip[:-1]
 offs1 = core.std.CopyFrameProps(offs1,clip)
 offs1 = core.vmaf.Metric(clip,offs1,2)
-offs1 = core.std.Expr([offs1,clip],'x y - abs')
+offs1 = core.std.Expr([offs1,clip],'x y - abs').fmtc.bitdepth(bits=16,dmode=1)
 offs1 = core.std.PlaneStats(offs1)
 offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax'],output='infos_running.txt',titles=[])
 offs1.set_output()'''
