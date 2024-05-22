@@ -20,22 +20,22 @@ parser.add_argument('-al','--audio-channel-layout',required=False,type=str,help=
 parser.add_argument('-ab','--audio-bitrate',required=False,type=str,help='output audio bitrate, use it like in ffmpeg. default 128k\n ')
 parser.add_argument('-ddt','--dedup-thresholds',required=False,type=str,help='ssim, max pixel diff (16 bits scale)\nand max consecutive deletion, inclusive. \ndefault 0.999,10240,2\n ',default='0.999,10240,2')
 parser.add_argument('--ffmpeg-params-output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1 -map_chapters -1\"\n ')
-parser.add_argument('--scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\" or \"none\", default mv\n ',default='mv')
-parser.add_argument('--thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,85\n ',default='200,85')
+parser.add_argument('--scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\", \"sudo\" or \"none\", default mv\n ',default='mv')
+parser.add_argument('--thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection or thresh of sudo,\ndefault 200,85 if mv, 0.92 if sudo\n ',default=None)
 parser.add_argument('--threads',required=False,type=int,help='how many threads to use in VS (core.num_threads),\ndefault auto detect (half of your total threads)\n ',default=None)
 parser.add_argument('--maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
 parser.add_argument('-m','--model',required=False,type=str,help='model version, default 4.8\n ',default='4.8')
-parser.add_argument('--slower-model',required=False,help='use ensemble model, some model won\'t work\n ',action=argparse.BooleanOptionalAction,default=False)
-parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt\n ',action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('--slower-model',required=False,help='use ensemble model, some model won\'t work\ndefault false\n ',action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt, default false\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT\n ',default='TRT')
 parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2\n ',default=2)
-parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not\n ',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not, default true\n ',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('--multi',required=False,type=int,help='multiple of interpolation, default 8\n ',default=8)
 parser.add_argument('-mf','--medium-fps',required=False,type=str,help='medium fps, format is "fpsnum,fpsden", default 192000,1001\n ',default="192000,1001")
 parser.add_argument('-of','--output-fps',required=False,type=str,help='output fps, format is "fpsnum,fpsden", default 60,1\n ',default="60,1")
-parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down\n ',action=argparse.BooleanOptionalAction,default=True)
-parser.add_argument('--skip-encode',required=False,help='skip final output encoding, hence you can do it yourself or even play it directly\n ',action=argparse.BooleanOptionalAction,default=False)
-parser.add_argument('--half-ssim',required=False,help='use 0.5x frame for ssim calculation, for speed\n ',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down, default true\n ',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('--skip-encode',required=False,help='skip final output encoding, hence you can do it yourself or even play it directly\ndefault false\n ',action=argparse.BooleanOptionalAction,default=False)
+parser.add_argument('--half-ssim',required=False,help='use 0.5x frame for ssim calculation, for speed, default true\n ',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('--adjacent',required=False,type=str,help=argparse.SUPPRESS,default='')#'delete adjacent frames of duplicated frames,\nthis can break consecutive deletion limit because of my garbage code,\nconsider this as for test purpose (string of relative frames like "+1,-1")\n '
 parser.parse_args(sys.argv[1:],args)
 
@@ -64,9 +64,18 @@ ssimt=float(ddt[0])
 pxdifft=int(ddt[1])
 consecutivet=int(ddt[2])
 
-if args.scd not in ['misc','mv','none']:
-    raise ValueError('scd must be misc, mv or none.')
-thscd1,thscd2=args.thscd.split(',')
+if args.scd not in ['misc','mv','sudo','none']:
+    raise ValueError('scd must be misc, mv, sudo or none.')
+if args.thscd==None:
+    if args.scd=='mv':
+        thscd1,thscd2=200,85
+    if args.scd=='sudo':
+        thscd=0.92
+else:
+    if args.scd=='mv':
+        thscd1,thscd2=args.thscd.split(',')
+    if args.scd=='sudo':
+        thscd=args.thscd
 
 model_ver_nvk={'2': 4,
                '2.3': 5,
@@ -236,7 +245,14 @@ offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax']
 offs1.set_output()'''
     script_parse=script_parse.format(NT=threads,MCS=args.maxmem,SRC=tmpV)
 
-    scd=f'sup = core.mv.Super(clip,pel=1,levels=1)\nbw = core.mv.Analyse(sup,isb=True,levels=1,truemotion=False)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})' if args.scd=='mv' else 'clip = core.misc.SCDetect(clip)' if args.scd=='misc' else ''
+    if args.scd=='mv':
+        scd=f'sup = core.mv.Super(clip,pel=1,levels=1)\nbw = core.mv.Analyse(sup,isb=True,levels=1,truemotion=False)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})'
+    elif args.scd=='sudo':
+        scd=f'import scene_detect as scd\nclip = scd.scene_detect(clip,thresh={thscd})'
+    elif args.scd=='misc':
+        scd='clip = core.misc.SCDetect(clip)'
+    else:
+        scd=''
 
     if not args.vs_mlrt:
         interp=\
