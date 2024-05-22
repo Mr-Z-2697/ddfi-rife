@@ -18,7 +18,7 @@ parser.add_argument('-vc','--video-codec',required=False,type=str,help='output v
 parser.add_argument('-ac','--audio-codec',required=False,type=str,help='output audio codec, similar to -vc. default libopus\n ')
 parser.add_argument('-al','--audio-channel-layout',required=False,type=str,help='output audio channel layout, \nuse the name in ffmpeg. default stereo\n ')
 parser.add_argument('-ab','--audio-bitrate',required=False,type=str,help='output audio bitrate, use it like in ffmpeg. default 128k\n ')
-parser.add_argument('-ddt','--dedup-thresholds',required=False,type=str,help='ssim, max pixel diff (16 bits and std.MakeDiff scale)\nand max consecutive deletion, inclusive. \ndefault 0.999,10240,2\n ',default='0.999,10240,2')
+parser.add_argument('-ddt','--dedup-thresholds',required=False,type=str,help='ssim, max pixel diff (16 bits scale)\nand max consecutive deletion, inclusive. \ndefault 0.999,10240,2\n ',default='0.999,10240,2')
 parser.add_argument('--ffmpeg-params-output',required=False,type=str,help='other ffmpeg parameters used in final step, \nuse it carefully. default \"-map_metadata -1 -map_chapters -1\"\n ')
 parser.add_argument('--scd',required=False,type=str,help='scene change detect method, \"misc\", \"mv\" or \"none\", default mv\n ',default='mv')
 parser.add_argument('--thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection, default 200,85\n ',default='200,85')
@@ -73,15 +73,29 @@ model_ver_nvk={'2': 4,
                '2.4': 6,
                '3.0': 7,
                '3.1': 8,
-               '4.0': 9,
-               '4.1': 11,
-               '4.2': 13,
-               '4.3': 15,
-               '4.4': 17,
-               '4.5': 19,
-               '4.6': 21,
-               '4.7': 23,
-               '4.8': 24}
+               '3.9': 9,
+               '4.0': 11,
+               '4.1': 13,
+               '4.2': 15,
+               '4.3': 17,
+               '4.4': 19,
+               '4.5': 21,
+               '4.6': 23,
+               '4.7': 25,
+               '4.8': 27,
+               '4.9': 29,
+               '4.10':31,
+               '4.11':33,
+               '4.12':35,
+               '4.12-lite':37,
+               '4.13':39,
+               '4.13-lite':41,
+               '4.14':43,
+               '4.14-lite':45,
+               '4.15':47,
+               '4.15-lite':49,
+               '4.16-lite':51, # deprecated?
+               }
 model_ver_mlrt={'4':40,
                 '4.0':40,
                 '4.2':42,
@@ -95,14 +109,22 @@ model_ver_mlrt={'4':40,
                 '4.10':410,
                 '4.11':411,
                 '4.12':412,
-                '4.12-lite':4121}
+                '4.12-lite':4121,
+                '4.13':413,
+                '4.13-lite':4131,
+                '4.14':414,
+                '4.14-lite':4141,
+                '4.15':415,
+                '4.15-lite':4151,
+                '4.16-lite':4161, # deprecated?
+                }
 if not args.vs_mlrt:
     if args.model in model_ver_nvk:
         args.model = model_ver_nvk[args.model]
     else:
         args.model=24
 
-    if args.model>=9 and args.model<23:
+    if args.model>=9 and args.model<52:
         args.model+=args.slower_model
 else:
     if args.model in model_ver_mlrt:
@@ -184,7 +206,7 @@ core.num_threads={NT}
 core.max_cache_size={MCS}
 import xvs
 from math import floor
-clip = core.ffms2.Source(r"{SRC}",cachefile="ffindex")
+clip = core.lsmas.LWLibavSource(r"{SRC}",cachefile="lwindex")
 halfw,halfh = floor(clip.width/4)*2,floor(clip.height/4)*2
 clip1 = core.resize.Bilinear(clip,halfw,halfh)
 offs1 = core.std.BlankClip(clip1,length=1)+clip1[:-1]
@@ -204,13 +226,11 @@ core=vs.core
 core.num_threads={NT}
 core.max_cache_size={MCS}
 import xvs
-clip = core.ffms2.Source(r"{SRC}",cachefile="ffindex")
+clip = core.lsmas.LWLibavSource(r"{SRC}",cachefile="lwindex").fmtc.bitdepth(bits=16,dmode=1)
 offs1 = core.std.BlankClip(clip,length=1)+clip[:-1]
 offs1 = core.std.CopyFrameProps(offs1,clip)
 offs1 = core.vmaf.Metric(clip,offs1,2)
-offs1 = core.std.MakeDiff(offs1,clip)
-offs1 = core.fmtc.bitdepth(offs1,bits=16)
-offs1 = core.std.Expr(offs1,'x 32768 - abs')
+offs1 = core.std.Expr([offs1,clip],'x y - abs')
 offs1 = core.std.PlaneStats(offs1)
 offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax'],output='infos_running.txt',titles=[])
 offs1.set_output()'''
@@ -243,7 +263,7 @@ core.num_threads={NT}
 core.max_cache_size={MCS}
 with open(r"framestodelete.txt","r") as f:
     dels=[int(i) for i in f]
-clip = core.ffms2.Source(r"{SRC}",cachefile="ffindex")
+clip = core.lsmas.LWLibavSource(r"{SRC}",cachefile="lwindex")
 src_fmt=clip.format
 try:
     matrix=clip.get_frame(0).props._Matrix
