@@ -10,7 +10,8 @@ A clumsy video auto duplication remove and frame interpolate script (mainly for 
 4. "Correct" the interpolated video with caculated timestamps
 5. Convert to 60fps cfr video
 
-*(yeah, its basically just simply excuting commands automatically except new-timestamps calculating part)*
+*(yeah, its basically just simply excuting commands automatically except new-timestamps calculating part)*  
+*(this is old concept and is not how the script now operates, but the general idea is the same)*
 
 ## Usage:
 run `ddfi2.py -h` or `python ddfi2.py -h` for detail
@@ -21,7 +22,7 @@ left: this script(rife ver.) | right: use rife directly (2-pass, with mvtools to
 https://user-images.githubusercontent.com/74594146/142829178-ff08b96f-9ca7-45ab-82f0-4e95be045f2d.mp4
 
 ## Downsides:
-more visible artifacts
+more visible artifacts because you are actually interpolating frames instead of f***ing with same frames over and over
 
 rife ver.:
 ![IMG](example/artifacts2.webp)
