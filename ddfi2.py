@@ -1,6 +1,7 @@
 import os,sys
 import argparse
 import subprocess
+import pathlib
 
 toolsFolder=f'{os.path.dirname(os.path.realpath(__file__))}\\tools\\'
 sys.path.append(toolsFolder)
@@ -76,6 +77,12 @@ else:
         thscd1,thscd2=args.thscd.split(',')
     if args.scd=='sudo':
         thscd=args.thscd
+
+if args.scd=='sudo':
+    sudo_onnx=pathlib.Path(toolsFolder).glob('*.onnx')
+    if len(sudo_onnx)!=1:
+        raise RuntimeError('exactly one sudo onnx model required.')
+    sudo_onnx=sudo_onnx[0]
 
 model_ver_nvk={'2': 4,
                '2.3': 5,
@@ -246,7 +253,7 @@ offs1.set_output()'''
     if args.scd=='mv':
         scd=f'sup = core.mv.Super(clip,pel=1,levels=1)\nbw = core.mv.Analyse(sup,isb=True,levels=1,truemotion=False)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})'
     elif args.scd=='sudo':
-        scd=f'import scene_detect as scd\nclip = scd.scene_detect(clip,thresh={thscd})'
+        scd=f'import scene_detect as scd\nclip = scd.scene_detect(clip,onnx_path="{sudo_onnx}",thresh={thscd})'
     elif args.scd=='misc':
         scd='clip = core.misc.SCDetect(clip)'
     else:
