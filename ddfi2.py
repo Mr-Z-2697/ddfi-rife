@@ -165,11 +165,9 @@ def processInfo():
     adjacents=[int(i) for i in args.adjacent.split(',')] if args.adjacent else []
     del_list=[]
     tsv2_list=[]
-    for i in range(len(lines)):
+    for i in range(1,len(lines)-1):
         l=lines[i]
         if l[2]>=ssimt and l[3]<=pxdifft and consecutive<consecutivet and not l[0] in del_list:
-            if l[0]==0:
-                continue
             consecutive+=1
             del_list.append(l[0])
             for i in adjacents:
