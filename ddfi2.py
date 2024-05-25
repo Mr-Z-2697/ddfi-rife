@@ -37,7 +37,8 @@ parser.add_argument('-of','--output-fps',required=False,type=str,help='output fp
 parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down, default true\n ',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('--skip-encode',required=False,help='skip final output encoding, hence you can do it yourself or even play it directly\ndefault false\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--half-ssim',required=False,help='use 0.5x frame for ssim calculation, for speed, default true\n ',action=argparse.BooleanOptionalAction,default=True)
-parser.add_argument('--mlrt-rife-impl',required=False,type=int,help='mlrt rife implementation, 1 or 2, default 1.',default=1)
+parser.add_argument('-impl','--mlrt-rife-impl',required=False,type=int,help='mlrt rife implementation, 1 or 2, default 1.',default=1)
+parser.add_argument('-opt','--trt-optim-level',required=False,type=int,help='trt optimization level, 0-5, default 5.',default=5)
 parser.add_argument('--adjacent',required=False,type=str,help=argparse.SUPPRESS,default='')#'delete adjacent frames of duplicated frames,\nthis can break consecutive deletion limit because of my garbage code,\nconsider this as for test purpose (string of relative frames like "+1,-1")\n '
 parser.parse_args(sys.argv[1:],args)
 
@@ -274,8 +275,8 @@ clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(arg
         interp=\
             '''from vsmlrt import RIFE,Backend
 clip = core.resize.Bicubic(clip,matrix_in=matrix,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}),_implementation=2)
-clip = core.resize.Bicubic(clip,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model)
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}),_implementation=2)
+clip = core.resize.Bicubic(clip,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model,OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '')
     else:
         interp=\
             '''from vsmlrt import RIFE,Backend
@@ -285,8 +286,8 @@ src_h = clip.height
 pad_w = ceil(src_w/32)*32
 pad_h = ceil(src_h/32)*32
 clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=matrix,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}),_implementation=1)
-clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model)
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}),_implementation=1)
+clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model,OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '')
 
     script='''import vapoursynth as vs
 core=vs.core
