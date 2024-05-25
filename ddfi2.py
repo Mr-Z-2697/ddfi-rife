@@ -79,7 +79,7 @@ else:
         thscd=args.thscd
 
 if args.scd=='sudo':
-    sudo_onnx=pathlib.Path(toolsFolder).glob('*.onnx')
+    sudo_onnx=(pathlib.Path(toolsFolder)/'scd-model').glob('*.onnx')
     sudo_onnx=list(sudo_onnx)
     if len(sudo_onnx)!=1:
         raise RuntimeError('exactly one sudo onnx model required.')
@@ -112,6 +112,7 @@ model_ver_nvk={'2': 4,
                '4.15':47,
                '4.15-lite':49,
                '4.16-lite':51, # deprecated?
+               '4.17':53,
                }
 model_ver_mlrt={'4':40,
                 '4.0':40,
@@ -134,6 +135,7 @@ model_ver_mlrt={'4':40,
                 '4.15':415,
                 '4.15-lite':4151,
                 '4.16-lite':4161, # deprecated?
+                '4.17':417,
                 }
 if not args.vs_mlrt:
     if args.model in model_ver_nvk:
@@ -141,7 +143,7 @@ if not args.vs_mlrt:
     else:
         args.model=24
 
-    if args.model>=9 and args.model<52:
+    if args.model>=9 and args.model<54:
         args.model+=args.slower_model
 else:
     if args.model in model_ver_mlrt:
