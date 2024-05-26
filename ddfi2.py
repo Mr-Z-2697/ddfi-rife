@@ -237,9 +237,7 @@ offs1 = core.std.CopyFrameProps(offs1,clip1)
 ssim = core.vmaf.Metric(clip1,offs1,2)
 offs1 = core.std.BlankClip(clip,length=1)+clip[:-1]
 offs1 = core.std.CopyFrameProps(offs1,ssim)
-offs1 = core.std.MakeDiff(offs1,clip)
-offs1 = core.fmtc.bitdepth(offs1,bits=16)
-offs1 = core.std.Expr(offs1,'x 32768 - abs')
+offs1 = core.std.Expr([offs1,clip],'x y - abs').fmtc.bitdepth(bits=16,dmode=1)
 offs1 = core.std.PlaneStats(offs1)
 offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax'],output='infos_running.txt',titles=[])
 offs1.set_output()''' \
