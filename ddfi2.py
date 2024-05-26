@@ -273,14 +273,26 @@ offs1.set_output()'''
             '''clip = core.rife.RIFE(clip,model={MVer},sc=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(args.model)) \
-        if args.model<9 else \
+        if args.model<11 else \
             '''clip = core.rife.RIFE(clip,model={MVer},sc=True,factor_num={MUL},factor_den=1)'''.format(MVer=int(args.model),MUL=args.multi)
+
     elif args.mlrt_rife_impl==2:
         interp=\
             '''from vsmlrt import RIFE,Backend
 clip = core.resize.Bicubic(clip,matrix_in=matrix,format=vs.RGB{HS})
 clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}),_implementation=2)
-clip = core.resize.Bicubic(clip,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model,OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/'timing.cache'}"' if args.mlrt_be=='TRT' else '')
+clip = core.resize.Bicubic(clip,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')
+'''.format(MVer=int(args.model),
+           MUL=args.multi,
+           BE=args.mlrt_be,
+           NS=args.mlrt_ns,
+           FP16=args.mlrt_fp16,
+           HS='SH'[args.mlrt_fp16],
+           OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',
+           ENSE=args.slower_model,
+           OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',
+           ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/"timing.cache"}"' if args.mlrt_be=='TRT' else '')
+
     else:
         interp=\
             '''from vsmlrt import RIFE,Backend
@@ -291,7 +303,17 @@ pad_w = ceil(src_w/32)*32
 pad_h = ceil(src_h/32)*32
 clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=matrix,format=vs.RGB{HS})
 clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}),_implementation=1)
-clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model,OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/'timing.cache'}"' if args.mlrt_be=='TRT' else '')
+clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')
+'''.format(MVer=int(args.model),
+           MUL=args.multi,
+           BE=args.mlrt_be,
+           NS=args.mlrt_ns,
+           FP16=args.mlrt_fp16,
+           HS='SH'[args.mlrt_fp16],
+           OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',
+           ENSE=args.slower_model,
+           OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',
+           ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/"timing.cache"}"' if args.mlrt_be=='TRT' else '')
 
     script='''import vapoursynth as vs
 core=vs.core
@@ -316,10 +338,17 @@ fw = core.mv.Analyse(sup){FAST}
 bw = core.mv.Analyse(sup,isb=True){FAST}
 clip = core.mv.{XFPS}(clip,sup,bw,fw,{OF})
 clip.set_output()
-'''.format(NT=threads,MCS=args.maxmem,SRC=tmpV,SCD=scd,INT=interp,MF=args.medium_fps,OF=args.output_fps,MUL=args.multi,
-TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=matrix)' if not args.vs_mlrt else '',
-TOYUV='clip = core.resize.Bicubic(clip,format=src_fmt.replace(bits_per_sample=10),matrix=matrix,dither_type="ordered")' if not args.vs_mlrt else '',
-FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',XFPS='BlockFPS' if args.fast_fps_convert_down else 'FlowFPS')
+'''.format(NT=threads,
+           MCS=args.maxmem,
+           SRC=tmpV,SCD=scd,
+           INT=interp,
+           MF=args.medium_fps,
+           OF=args.output_fps,
+           MUL=args.multi,
+           TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=matrix)' if not args.vs_mlrt else '',
+           TOYUV='clip = core.resize.Bicubic(clip,format=src_fmt.replace(bits_per_sample=10),matrix=matrix,dither_type="ordered")' if not args.vs_mlrt else '',
+           FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',
+           XFPS='BlockFPS' if args.fast_fps_convert_down else 'FlowFPS')
 
     with open(tmpParseVpy,'w',encoding='utf-8') as vpy:
         print(script_parse,file=vpy)
