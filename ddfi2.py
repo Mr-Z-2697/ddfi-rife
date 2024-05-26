@@ -48,7 +48,6 @@ outFile=inFile.parent/(inFile.stem+'_interp.mkv') if args.output is None else pa
 tmpFolder=outFile.parent/(outFile.stem+'_tmp') if args.temp_folder is None else pathlib.Path(args.temp_folder)
 
 inFile,outFile,tmpFolder=map(pathlib.Path.absolute,(inFile,outFile,tmpFolder))
-# tmpFolder+='\\' if tmpFolder[-1] != '\\' else ''
 
 ffss='' if args.start_time is None else f'-ss {args.start_time}'
 ffto='' if args.end_time is None else f'-to {args.end_time}'
@@ -165,6 +164,7 @@ tmpTSV2N=tmpFolder/f'tsv2nX{args.multi}.txt'
 
 ffpath=toolsFolder/'ffmpeg'
 vspipepath=toolsFolder/'python-vapoursynth-plugins'/'vspipe'
+enginefolder=toolsFolder/'trt-engines'
 
 def processInfo():
     with open(tmpInfos,'r') as f:
@@ -279,8 +279,8 @@ clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(arg
         interp=\
             '''from vsmlrt import RIFE,Backend
 clip = core.resize.Bicubic(clip,matrix_in=matrix,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}),_implementation=2)
-clip = core.resize.Bicubic(clip,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model,OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '')
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}),_implementation=2)
+clip = core.resize.Bicubic(clip,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model,OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/'timing.cache'}"' if args.mlrt_be=='TRT' else '')
     else:
         interp=\
             '''from vsmlrt import RIFE,Backend
@@ -290,8 +290,8 @@ src_h = clip.height
 pad_w = ceil(src_w/32)*32
 pad_h = ceil(src_h/32)*32
 clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=matrix,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}),_implementation=1)
-clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model,OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '')
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}),_implementation=1)
+clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model,OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/'timing.cache'}"' if args.mlrt_be=='TRT' else '')
 
     script='''import vapoursynth as vs
 core=vs.core
@@ -342,6 +342,9 @@ if tmpFolder.exists():
         sys.exit()
 else:
     os.mkdir(tmpFolder)
+
+with open(tmpFolder/'command.txt','a',encoding='utf-8') as comtxt:
+    print(' '.join(sys.argv),file=comtxt)
 
 if not tmpV.exists():
     cutpath=tmpFolder/'cut.mkv'
