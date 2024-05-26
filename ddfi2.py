@@ -3,8 +3,8 @@ import argparse
 import subprocess
 import pathlib
 
-toolsFolder=f'{os.path.dirname(os.path.realpath(__file__))}\\tools\\'
-sys.path.append(toolsFolder)
+toolsFolder=pathlib.Path(__file__).absolute().parent/'tools'
+sys.path.append(str(toolsFolder))
 class args:
     pass
 parser = argparse.ArgumentParser(description='an video auto duplicated frame remove and frame interpolate script, uses ffmpeg and vapoursynth.',formatter_class=argparse.RawTextHelpFormatter)
@@ -43,12 +43,12 @@ parser.add_argument('--adjacent',required=False,type=str,help=argparse.SUPPRESS,
 parser.parse_args(sys.argv[1:],args)
 
 
-inFile=args.input
-outFile=os.path.splitext(inFile)[0]+'_interp.mkv' if args.output is None else args.output
-tmpFolder=os.path.splitext(outFile)[0]+'_tmp' if args.temp_folder is None else args.temp_folder
+inFile=pathlib.Path(args.input)
+outFile=inFile.parent/(inFile.stem+'_interp.mkv') if args.output is None else pathlib.Path(args.output)
+tmpFolder=outFile.parent/(outFile.stem+'_tmp') if args.temp_folder is None else pathlib.Path(args.temp_folder)
 
-inFile,outFile,tmpFolder=map(os.path.abspath,(inFile,outFile,tmpFolder))
-tmpFolder+='\\' if tmpFolder[-1] != '\\' else ''
+inFile,outFile,tmpFolder=map(pathlib.Path.absolute,(inFile,outFile,tmpFolder))
+# tmpFolder+='\\' if tmpFolder[-1] != '\\' else ''
 
 ffss='' if args.start_time is None else f'-ss {args.start_time}'
 ffto='' if args.end_time is None else f'-to {args.end_time}'
@@ -81,7 +81,7 @@ else:
         thscd=args.thscd
 
 if args.scd=='sudo':
-    sudo_onnx=(pathlib.Path(toolsFolder)/'scd-model').glob('*.onnx')
+    sudo_onnx=(toolsFolder/'scd-model').glob('*.onnx')
     sudo_onnx=list(sudo_onnx)
     if len(sudo_onnx)!=1:
         raise RuntimeError('exactly one sudo onnx model required.')
@@ -155,15 +155,19 @@ else:
     else:
         args.model = 48
 
-tmpV=os.path.abspath(tmpFolder+'_tmp.mkv') if args.start_time!=None or args.end_time!=None else inFile
-tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
-tmpTSV2N=os.path.abspath(f'{tmpFolder}tsv2nX{args.multi}.txt')
+tmpV=tmpFolder/'_tmp.mkv' if args.start_time!=None or args.end_time!=None else inFile
+tmpParseVpy=tmpFolder/'parse.vpy'
+tmpInterpVpy=tmpFolder/f'interpX{args.multi}.vpy'
+tmpInfos=tmpFolder/'infos.txt'
+tmpDelList=tmpFolder/'framestodelete.txt'
+tmpTSV2O=tmpFolder/'tsv2o.txt'
+tmpTSV2N=tmpFolder/f'tsv2nX{args.multi}.txt'
 
-ffpath=mmgpath=dllpath=toolsFolder
-vspipepath=toolsFolder+'python-vapoursynth-plugins\\'
+ffpath=toolsFolder/'ffmpeg'
+vspipepath=toolsFolder/'python-vapoursynth-plugins'/'vspipe'
 
 def processInfo():
-    with open(tmpFolder+'infos.txt','r') as f:
+    with open(tmpInfos,'r') as f:
         lines=[i.split('\t') for i in f][1:]
     for i in range(len(lines)):
         lines[i][0]=int(lines[i][0])
@@ -193,9 +197,9 @@ def processInfo():
             l=lines[i]
             if not l[0] in del_list:
                 tsv2_list.append(l[1]-startpts)
-    with open(tmpFolder+'framestodelete.txt','w') as dels:
+    with open(tmpDelList,'w') as dels:
         dels.write('\n'.join(map(str,del_list)))
-    with open(tmpFolder+'tsv2o.txt','w') as tsv2o:
+    with open(tmpTSV2O,'w') as tsv2o:
         tsv2o.write('#timestamp format v2\n')
         tsv2o.write('\n'.join(map(str,tsv2_list)))
 
@@ -317,21 +321,21 @@ TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=matrix)' if not 
 TOYUV='clip = core.resize.Bicubic(clip,format=src_fmt.replace(bits_per_sample=10),matrix=matrix,dither_type="ordered")' if not args.vs_mlrt else '',
 FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',XFPS='BlockFPS' if args.fast_fps_convert_down else 'FlowFPS')
 
-    with open(f'{tmpFolder}parse.vpy','w',encoding='utf-8') as vpy:
+    with open(tmpParseVpy,'w',encoding='utf-8') as vpy:
         print(script_parse,file=vpy)
 
-    with open(f'{tmpFolder}interpX{args.multi}.vpy','w',encoding='utf-8') as vpy:
+    with open(tmpInterpVpy,'w',encoding='utf-8') as vpy:
         print(script,file=vpy)
 
-if not os.path.exists(inFile):
+if not inFile.exists():
     print('input file isn\'t exist')
     sys.exit()
-if os.path.exists(outFile):
+if outFile.exists():
     if input('output file exists, continue? (y/n) ')=='y':
         pass
     else:
         sys.exit()
-if os.path.exists(tmpFolder):
+if tmpFolder.exists():
     if input('temp folder exists, continue? (y/n) ')=='y':
         pass
     else:
@@ -339,23 +343,24 @@ if os.path.exists(tmpFolder):
 else:
     os.mkdir(tmpFolder)
 
-if not os.path.exists(tmpV):
-    ff_intermedia=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -map 0:v:0 {ffau} {clo} -c:a flac -c:v copy -y \"{tmpFolder}cut.mkv\"'
+if not tmpV.exists():
+    cutpath=tmpFolder/'cut.mkv'
+    ff_intermedia=f'\"{ffpath}\" {ffss} {ffto} -i \"{inFile}\" -map 0:v:0 {ffau} {clo} -c:a flac -c:v copy -y \"{cutpath}\"'
     print(ff_intermedia)
     subprocess.run(ff_intermedia,shell=True)
-    os.rename(f'{tmpFolder}cut.mkv',tmpV)
+    os.rename(cutpath,tmpV)
 
 vpyGen()
-if not os.path.exists(tmpFolder+'infos.txt'):
+if not tmpInfos.exists():
     print('calculating ssim.')
-    parse=subprocess.run(f'\"{vspipepath}vspipe.exe\" \"{tmpFolder}parse.vpy\" -p .',shell=True)
+    parse=subprocess.run(f'\"{vspipepath}\" \"{tmpParseVpy}\" -p .',shell=True)
     if parse.returncode==0:
-        os.rename(tmpFolder+'infos_running.txt',tmpFolder+'infos.txt')
+        os.rename(tmpFolder/'infos_running.txt',tmpInfos)
     else:
         raise RuntimeError('ssim parsing failed, please check your settings then try again.')
 processInfo()
 newTSgen()
-cmdinterp=f'\"{vspipepath}vspipe.exe\" -c y4m \"{tmpFolder}interpX{args.multi}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
+cmdinterp=f'\"{vspipepath}\" -c y4m \"{tmpInterpVpy}\" - | \"{ffpath}\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
 print(cmdinterp)
 if not args.skip_encode:
     subprocess.run(cmdinterp,shell=True)
