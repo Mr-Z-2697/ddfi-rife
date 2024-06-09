@@ -31,6 +31,7 @@ parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt, default false\
 parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT\n ',default='TRT')
 parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2\n ',default=2)
 parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not, default true\n ',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('--mlrt-int8',required=False,help='whether to use int8 or not, default false\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--multi',required=False,type=int,help='multiple of interpolation, default 8\n ',default=8)
 parser.add_argument('-mf','--medium-fps',required=False,type=str,help='medium fps, format is "fpsnum,fpsden", default 192000,1001\n ',default="192000,1001")
 parser.add_argument('-of','--output-fps',required=False,type=str,help='output fps, format is "fpsnum,fpsden", default 60,1\n ',default="60,1")
@@ -278,7 +279,7 @@ clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(arg
         interp=\
             '''from vsmlrt import RIFE,Backend
 clip = core.resize.Bicubic(clip,matrix_in=matrix,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}),_implementation=2)
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}{INT8}),_implementation=2)
 clip = core.resize.Bicubic(clip,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')
 '''.format(MVer=int(args.model),
            MUL=args.multi,
@@ -289,7 +290,9 @@ clip = core.resize.Bicubic(clip,matrix=matrix,format=src_fmt.replace(bits_per_sa
            OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',
            ENSE=args.slower_model,
            OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',
-           ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/"timing.cache"}"' if args.mlrt_be=='TRT' else '')
+           ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/"timing.cache"}"' if args.mlrt_be=='TRT' else '',
+           INT8=',int8=True' if args.mlrt_int8 and args.mlrt_be=='TRT' else '',
+           )
 
     else:
         interp=\
@@ -300,7 +303,7 @@ src_h = clip.height
 pad_w = ceil(src_w/32)*32
 pad_h = ceil(src_h/32)*32
 clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=matrix,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}),_implementation=1)
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}{INT8}),_implementation=1)
 clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')
 '''.format(MVer=int(args.model),
            MUL=args.multi,
@@ -311,7 +314,9 @@ clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,mat
            OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',
            ENSE=args.slower_model,
            OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',
-           ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/"timing.cache"}"' if args.mlrt_be=='TRT' else '')
+           ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/"timing.cache"}"' if args.mlrt_be=='TRT' else '',
+           INT8=',int8=True' if args.mlrt_int8 and args.mlrt_be=='TRT' else '',
+           )
 
     script='''import vapoursynth as vs
 core=vs.core
