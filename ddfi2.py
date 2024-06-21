@@ -3,8 +3,8 @@ import argparse
 import subprocess
 import pathlib
 
-toolsFolder=f'{os.path.dirname(os.path.realpath(__file__))}\\tools\\'
-sys.path.append(toolsFolder)
+toolsFolder=pathlib.Path(__file__).absolute().parent/'tools'
+sys.path.append(str(toolsFolder))
 class args:
     pass
 parser = argparse.ArgumentParser(description='an video auto duplicated frame remove and frame interpolate script, uses ffmpeg and vapoursynth.',formatter_class=argparse.RawTextHelpFormatter)
@@ -25,28 +25,30 @@ parser.add_argument('--scd',required=False,type=str,help='scene change detect me
 parser.add_argument('--thscd',required=False,type=str,help='thscd1&2 of core.mv.SCDetection or thresh of sudo,\ndefault 200,85 if mv, 0.92 if sudo\n ',default=None)
 parser.add_argument('--threads',required=False,type=int,help='how many threads to use in VS (core.num_threads),\ndefault auto detect (half of your total threads)\n ',default=None)
 parser.add_argument('--maxmem',required=False,type=int,help='max memory to use for cache in VS (core.max_cache_size) in MB, default 4096\n ',default=4096)
-parser.add_argument('-m','--model',required=False,type=str,help='model version, default 4.8\n ',default='4.8')
+parser.add_argument('-m','--model',required=False,type=str,help='model version, default 4.15\n ',default='4.15')
 parser.add_argument('--slower-model',required=False,help='use ensemble model, some model won\'t work\ndefault false\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--vs-mlrt',required=False,help='use vs-mlrt, default false\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--mlrt-be',required=False,type=str,help='backend in vs-mlrt, default TRT\n ',default='TRT')
 parser.add_argument('--mlrt-ns',required=False,type=int,help='num_streams in vs-mlrt, default 2\n ',default=2)
 parser.add_argument('--mlrt-fp16',required=False,help='whether to use fp16 or not, default true\n ',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('--mlrt-int8',required=False,help='whether to use int8 or not, default false\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--multi',required=False,type=int,help='multiple of interpolation, default 8\n ',default=8)
 parser.add_argument('-mf','--medium-fps',required=False,type=str,help='medium fps, format is "fpsnum,fpsden", default 192000,1001\n ',default="192000,1001")
 parser.add_argument('-of','--output-fps',required=False,type=str,help='output fps, format is "fpsnum,fpsden", default 60,1\n ',default="60,1")
 parser.add_argument('--fast-fps-convert-down',required=False,help='use "fast mode" in the final fps convert down, default true\n ',action=argparse.BooleanOptionalAction,default=True)
 parser.add_argument('--skip-encode',required=False,help='skip final output encoding, hence you can do it yourself or even play it directly\ndefault false\n ',action=argparse.BooleanOptionalAction,default=False)
 parser.add_argument('--half-ssim',required=False,help='use 0.5x frame for ssim calculation, for speed, default true\n ',action=argparse.BooleanOptionalAction,default=True)
+parser.add_argument('-impl','--mlrt-rife-impl',required=False,type=int,help='mlrt rife implementation, 1 or 2, default 1.',default=1)
+parser.add_argument('-opt','--trt-optim-level',required=False,type=int,help='trt optimization level, 0-5, default 5.',default=5)
 parser.add_argument('--adjacent',required=False,type=str,help=argparse.SUPPRESS,default='')#'delete adjacent frames of duplicated frames,\nthis can break consecutive deletion limit because of my garbage code,\nconsider this as for test purpose (string of relative frames like "+1,-1")\n '
 parser.parse_args(sys.argv[1:],args)
 
 
-inFile=args.input
-outFile=os.path.splitext(inFile)[0]+'_interp.mkv' if args.output is None else args.output
-tmpFolder=os.path.splitext(outFile)[0]+'_tmp' if args.temp_folder is None else args.temp_folder
+inFile=pathlib.Path(args.input)
+outFile=inFile.parent/(inFile.stem+'_interp.mkv') if args.output is None else pathlib.Path(args.output)
+tmpFolder=outFile.parent/(outFile.stem+'_tmp') if args.temp_folder is None else pathlib.Path(args.temp_folder)
 
-inFile,outFile,tmpFolder=map(os.path.abspath,(inFile,outFile,tmpFolder))
-tmpFolder+='\\' if tmpFolder[-1] != '\\' else ''
+inFile,outFile,tmpFolder=map(pathlib.Path.absolute,(inFile,outFile,tmpFolder))
 
 ffss='' if args.start_time is None else f'-ss {args.start_time}'
 ffto='' if args.end_time is None else f'-to {args.end_time}'
@@ -79,7 +81,8 @@ else:
         thscd=args.thscd
 
 if args.scd=='sudo':
-    sudo_onnx=pathlib.Path(toolsFolder).glob('*.onnx')
+    sudo_onnx=(toolsFolder/'scd-model').glob('*.onnx')
+    sudo_onnx=list(sudo_onnx)
     if len(sudo_onnx)!=1:
         raise RuntimeError('exactly one sudo onnx model required.')
     sudo_onnx=sudo_onnx[0]
@@ -111,6 +114,7 @@ model_ver_nvk={'2': 4,
                '4.15':47,
                '4.15-lite':49,
                '4.16-lite':51, # deprecated?
+               '4.17':53,
                }
 model_ver_mlrt={'4':40,
                 '4.0':40,
@@ -133,6 +137,7 @@ model_ver_mlrt={'4':40,
                 '4.15':415,
                 '4.15-lite':4151,
                 '4.16-lite':4161, # deprecated?
+                '4.17':417,
                 }
 if not args.vs_mlrt:
     if args.model in model_ver_nvk:
@@ -140,7 +145,7 @@ if not args.vs_mlrt:
     else:
         args.model=24
 
-    if args.model>=9 and args.model<52:
+    if args.model>=9 and args.model<54:
         args.model+=args.slower_model
 else:
     if args.model in model_ver_mlrt:
@@ -150,15 +155,20 @@ else:
     else:
         args.model = 48
 
-tmpV=os.path.abspath(tmpFolder+'_tmp.mkv') if args.start_time!=None or args.end_time!=None else inFile
-tmpTSV2O=os.path.abspath(f'{tmpFolder}tsv2o.txt')
-tmpTSV2N=os.path.abspath(f'{tmpFolder}tsv2nX{args.multi}.txt')
+tmpV=tmpFolder/'_tmp.mkv' if args.start_time!=None or args.end_time!=None else inFile
+tmpParseVpy=tmpFolder/'parse.vpy'
+tmpInterpVpy=tmpFolder/f'interpX{args.multi}.vpy'
+tmpInfos=tmpFolder/'infos.txt'
+tmpDelList=tmpFolder/'framestodelete.txt'
+tmpTSV2O=tmpFolder/'tsv2o.txt'
+tmpTSV2N=tmpFolder/f'tsv2nX{args.multi}.txt'
 
-ffpath=mmgpath=dllpath=toolsFolder
-vspipepath=toolsFolder+'python-vapoursynth-plugins\\'
+ffpath=toolsFolder/'ffmpeg'
+vspipepath=toolsFolder/'python-vapoursynth-plugins'/'vspipe'
+enginefolder=toolsFolder/'trt-engines'
 
 def processInfo():
-    with open(tmpFolder+'infos.txt','r') as f:
+    with open(tmpInfos,'r') as f:
         lines=[i.split('\t') for i in f][1:]
     for i in range(len(lines)):
         lines[i][0]=int(lines[i][0])
@@ -188,9 +198,9 @@ def processInfo():
             l=lines[i]
             if not l[0] in del_list:
                 tsv2_list.append(l[1]-startpts)
-    with open(tmpFolder+'framestodelete.txt','w') as dels:
+    with open(tmpDelList,'w') as dels:
         dels.write('\n'.join(map(str,del_list)))
-    with open(tmpFolder+'tsv2o.txt','w') as tsv2o:
+    with open(tmpTSV2O,'w') as tsv2o:
         tsv2o.write('#timestamp format v2\n')
         tsv2o.write('\n'.join(map(str,tsv2_list)))
 
@@ -228,9 +238,7 @@ offs1 = core.std.CopyFrameProps(offs1,clip1)
 ssim = core.vmaf.Metric(clip1,offs1,2)
 offs1 = core.std.BlankClip(clip,length=1)+clip[:-1]
 offs1 = core.std.CopyFrameProps(offs1,ssim)
-offs1 = core.std.MakeDiff(offs1,clip)
-offs1 = core.fmtc.bitdepth(offs1,bits=16)
-offs1 = core.std.Expr(offs1,'x 32768 - abs')
+offs1 = core.std.Expr([offs1,clip],'x y - abs').fmtc.bitdepth(bits=16,dmode=1)
 offs1 = core.std.PlaneStats(offs1)
 offs1 = xvs.props2csv(offs1,props=['_AbsoluteTime','float_ssim','PlaneStatsMax'],output='infos_running.txt',titles=[])
 offs1.set_output()''' \
@@ -253,7 +261,7 @@ offs1.set_output()'''
     if args.scd=='mv':
         scd=f'sup = core.mv.Super(clip,pel=1,levels=1)\nbw = core.mv.Analyse(sup,isb=True,levels=1,truemotion=False)\nclip = core.mv.SCDetection(clip,bw,thscd1={thscd1},thscd2={thscd2})'
     elif args.scd=='sudo':
-        scd=f'import scene_detect as scd\nclip = scd.scene_detect(clip,onnx_path="{sudo_onnx}",thresh={thscd})'
+        scd=f'import scene_detect as scd\nclip = scd.scene_detect(clip,onnx_path=r"{sudo_onnx}",thresh={thscd})'
     elif args.scd=='misc':
         scd='clip = core.misc.SCDetect(clip)'
     else:
@@ -264,8 +272,28 @@ offs1.set_output()'''
             '''clip = core.rife.RIFE(clip,model={MVer},sc=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)
 clip = core.rife.RIFE(clip,model={MVer},sc=True,uhd=True)'''.format(MVer=int(args.model)) \
-        if args.model<9 else \
+        if args.model<11 else \
             '''clip = core.rife.RIFE(clip,model={MVer},sc=True,factor_num={MUL},factor_den=1)'''.format(MVer=int(args.model),MUL=args.multi)
+
+    elif args.mlrt_rife_impl==2:
+        interp=\
+            '''from vsmlrt import RIFE,Backend
+clip = core.resize.Bicubic(clip,matrix_in=matrix,format=vs.RGB{HS})
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}{INT8}),_implementation=2)
+clip = core.resize.Bicubic(clip,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')
+'''.format(MVer=int(args.model),
+           MUL=args.multi,
+           BE=args.mlrt_be,
+           NS=args.mlrt_ns,
+           FP16=args.mlrt_fp16,
+           HS='SH'[args.mlrt_fp16],
+           OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',
+           ENSE=args.slower_model,
+           OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',
+           ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/"timing.cache"}"' if args.mlrt_be=='TRT' else '',
+           INT8=',int8=True' if args.mlrt_int8 and args.mlrt_be=='TRT' else '',
+           )
+
     else:
         interp=\
             '''from vsmlrt import RIFE,Backend
@@ -275,8 +303,20 @@ src_h = clip.height
 pad_w = ceil(src_w/32)*32
 pad_h = ceil(src_h/32)*32
 clip = core.resize.Bicubic(clip,pad_w,pad_h,src_width=pad_w,src_height=pad_h,matrix_in=matrix,format=vs.RGB{HS})
-clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}))
-clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')'''.format(MVer=int(args.model),MUL=args.multi,BE=args.mlrt_be,NS=args.mlrt_ns,FP16=args.mlrt_fp16,HS='SH'[args.mlrt_fp16],OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',ENSE=args.slower_model)
+clip = RIFE(clip,model={MVer},ensemble={ENSE},multi={MUL},backend=Backend.{BE}(num_streams={NS},fp16={FP16}{OFMT}{OPTIM}{ENGF}{INT8}),_implementation=1)
+clip = core.resize.Bicubic(clip,src_w,src_h,src_width=src_w,src_height=src_h,matrix=matrix,format=src_fmt.replace(bits_per_sample=10),dither_type='ordered')
+'''.format(MVer=int(args.model),
+           MUL=args.multi,
+           BE=args.mlrt_be,
+           NS=args.mlrt_ns,
+           FP16=args.mlrt_fp16,
+           HS='SH'[args.mlrt_fp16],
+           OFMT=',output_format='+str(int(args.mlrt_fp16)) if args.mlrt_be=='TRT' else '',
+           ENSE=args.slower_model,
+           OPTIM=f',builder_optimization_level={args.trt_optim_level}' if args.mlrt_be=='TRT' else '',
+           ENGF=f',engine_folder=r"{enginefolder}",timing_cache=r"{enginefolder/"timing.cache"}"' if args.mlrt_be=='TRT' else '',
+           INT8=',int8=True' if args.mlrt_int8 and args.mlrt_be=='TRT' else '',
+           )
 
     script='''import vapoursynth as vs
 core=vs.core
@@ -301,26 +341,33 @@ fw = core.mv.Analyse(sup){FAST}
 bw = core.mv.Analyse(sup,isb=True){FAST}
 clip = core.mv.{XFPS}(clip,sup,bw,fw,{OF})
 clip.set_output()
-'''.format(NT=threads,MCS=args.maxmem,SRC=tmpV,SCD=scd,INT=interp,MF=args.medium_fps,OF=args.output_fps,MUL=args.multi,
-TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=matrix)' if not args.vs_mlrt else '',
-TOYUV='clip = core.resize.Bicubic(clip,format=src_fmt.replace(bits_per_sample=10),matrix=matrix,dither_type="ordered")' if not args.vs_mlrt else '',
-FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',XFPS='BlockFPS' if args.fast_fps_convert_down else 'FlowFPS')
+'''.format(NT=threads,
+           MCS=args.maxmem,
+           SRC=tmpV,SCD=scd,
+           INT=interp,
+           MF=args.medium_fps,
+           OF=args.output_fps,
+           MUL=args.multi,
+           TORGB='clip = core.resize.Bicubic(clip,format=vs.RGBS,matrix_in=matrix)' if not args.vs_mlrt else '',
+           TOYUV='clip = core.resize.Bicubic(clip,format=src_fmt.replace(bits_per_sample=10),matrix=matrix,dither_type="ordered")' if not args.vs_mlrt else '',
+           FAST='[0]*clip.num_frames' if args.fast_fps_convert_down else '',
+           XFPS='BlockFPS' if args.fast_fps_convert_down else 'FlowFPS')
 
-    with open(f'{tmpFolder}parse.vpy','w',encoding='utf-8') as vpy:
+    with open(tmpParseVpy,'w',encoding='utf-8') as vpy:
         print(script_parse,file=vpy)
 
-    with open(f'{tmpFolder}interpX{args.multi}.vpy','w',encoding='utf-8') as vpy:
+    with open(tmpInterpVpy,'w',encoding='utf-8') as vpy:
         print(script,file=vpy)
 
-if not os.path.exists(inFile):
+if not inFile.exists():
     print('input file isn\'t exist')
     sys.exit()
-if os.path.exists(outFile):
+if outFile.exists():
     if input('output file exists, continue? (y/n) ')=='y':
         pass
     else:
         sys.exit()
-if os.path.exists(tmpFolder):
+if tmpFolder.exists():
     if input('temp folder exists, continue? (y/n) ')=='y':
         pass
     else:
@@ -328,23 +375,27 @@ if os.path.exists(tmpFolder):
 else:
     os.mkdir(tmpFolder)
 
-if not os.path.exists(tmpV):
-    ff_intermedia=f'\"{ffpath}ffmpeg.exe\" {ffss} {ffto} -i \"{inFile}\" -map 0:v:0 {ffau} {clo} -c:a flac -c:v copy -y \"{tmpFolder}cut.mkv\"'
+with open(tmpFolder/'command.txt','a',encoding='utf-8') as comtxt:
+    print(' '.join(sys.argv),file=comtxt)
+
+if not tmpV.exists():
+    cutpath=tmpFolder/'cut.mkv'
+    ff_intermedia=f'\"{ffpath}\" {ffss} {ffto} -i \"{inFile}\" -map 0:v:0 {ffau} {clo} -c:a flac -c:v copy -y \"{cutpath}\"'
     print(ff_intermedia)
     subprocess.run(ff_intermedia,shell=True)
-    os.rename(f'{tmpFolder}cut.mkv',tmpV)
+    os.rename(cutpath,tmpV)
 
 vpyGen()
-if not os.path.exists(tmpFolder+'infos.txt'):
+if not tmpInfos.exists():
     print('calculating ssim.')
-    parse=subprocess.run(f'\"{vspipepath}vspipe.exe\" \"{tmpFolder}parse.vpy\" -p .',shell=True)
+    parse=subprocess.run(f'\"{vspipepath}\" \"{tmpParseVpy}\" -p .',shell=True)
     if parse.returncode==0:
-        os.rename(tmpFolder+'infos_running.txt',tmpFolder+'infos.txt')
+        os.rename(tmpFolder/'infos_running.txt',tmpInfos)
     else:
         raise RuntimeError('ssim parsing failed, please check your settings then try again.')
 processInfo()
 newTSgen()
-cmdinterp=f'\"{vspipepath}vspipe.exe\" -c y4m \"{tmpFolder}interpX{args.multi}.vpy\" - | \"{ffpath}ffmpeg.exe\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
+cmdinterp=f'\"{vspipepath}\" -c y4m \"{tmpInterpVpy}\" - | \"{ffpath}\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
 print(cmdinterp)
 if not args.skip_encode:
     subprocess.run(cmdinterp,shell=True)
