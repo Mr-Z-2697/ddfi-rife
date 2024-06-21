@@ -138,6 +138,7 @@ model_ver_mlrt={'4':40,
                 '4.15-lite':4151,
                 '4.16-lite':4161, # deprecated?
                 '4.17':417,
+                '4.17-lite':4171,
                 }
 if not args.vs_mlrt:
     if args.model in model_ver_nvk:
