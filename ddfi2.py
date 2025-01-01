@@ -329,6 +329,7 @@ clip = core.lsmas.LWLibavSource(r"{SRC}",cachefile="lwindex")
 src_fmt=clip.format
 try:
     matrix=clip.get_frame(0).props._Matrix
+    if matrix==2: matrix=1
 except:
     matrix=1
 clip = core.std.DeleteFrames(clip,dels)
