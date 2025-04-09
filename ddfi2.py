@@ -115,6 +115,20 @@ model_ver_nvk={'2': 4,
                '4.15-lite':49,
                '4.16-lite':51, # deprecated?
                '4.17':53,
+               '4.17-lite':55,
+               '4.18':57,
+               '4.19-beta':59,
+               '4.20':61,
+               '4.21':63,
+               '4.22':64,
+               '4.22-lite':65,
+               '4.23-beta':66,
+               '4.24':67,
+               '4.25':69,
+               '4.25-lite':70,
+               '4.25-heavy':71,
+               '4.26':72,
+               '4.26-large':73,
                }
 model_ver_mlrt={'4':40,
                 '4.0':40,
@@ -139,6 +153,19 @@ model_ver_mlrt={'4':40,
                 '4.16-lite':4161, # deprecated?
                 '4.17':417,
                 '4.17-lite':4171,
+                '4.18':418,
+                '4.19':419,
+                '4.20':420,
+                '4.21':421,
+                '4.22':422,
+                '4.22-lite':4221,
+                '4.23':423,
+                '4.24':424,
+                '4.25':425,
+                '4.25-lite':4251,
+                '4.25-heavy':4252,
+                '4.26':426,
+                '4.26-large':4262,
                 }
 if not args.vs_mlrt:
     if args.model in model_ver_nvk:
@@ -146,7 +173,7 @@ if not args.vs_mlrt:
     else:
         args.model=24
 
-    if args.model>=9 and args.model<54:
+    if args.model>=9 and args.model<54 and args.model not in (63,64,65,66,69,70,71,72,73):
         args.model+=args.slower_model
 else:
     if args.model in model_ver_mlrt:
@@ -199,6 +226,12 @@ def processInfo():
             l=lines[i]
             if not l[0] in del_list:
                 tsv2_list.append(l[1]-startpts)
+    if not del_list:
+        print('Warning: detected 0 duplicated frames, you should loosen the threshold or use regular interpolation.')
+        while eeeeee:=input('continue? (y/n):').lower() not in ('y','n'):
+            pass
+        if eeeeee=='n':
+            sys.exit()
     with open(tmpDelList,'w') as dels:
         dels.write('\n'.join(map(str,del_list)))
     with open(tmpTSV2O,'w') as tsv2o:
@@ -332,7 +365,8 @@ try:
     if matrix==2: matrix=1
 except:
     matrix=1
-clip = core.std.DeleteFrames(clip,dels)
+if dels:
+    clip = core.std.DeleteFrames(clip,dels)
 {SCD}
 {TORGB}
 {INT}
