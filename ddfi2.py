@@ -231,12 +231,13 @@ def processInfo():
         while eeeeee:=input('continue? (y/n):').lower() not in ('y','n'):
             pass
         if eeeeee=='n':
-            sys.exit()
+            return 1
     with open(tmpDelList,'w') as dels:
         dels.write('\n'.join(map(str,del_list)))
     with open(tmpTSV2O,'w') as tsv2o:
         tsv2o.write('#timestamp format v2\n')
         tsv2o.write('\n'.join(map(str,tsv2_list)))
+    return 0
 
 def newTSgen():
     ts_new=list()
@@ -429,7 +430,8 @@ if not tmpInfos.exists():
         os.rename(tmpFolder/'infos_running.txt',tmpInfos)
     else:
         raise RuntimeError('ssim parsing failed, please check your settings then try again.')
-processInfo()
+if processInfo():
+    sys.exit()
 newTSgen()
 cmdinterp=f'\"{vspipepath}\" -c y4m \"{tmpInterpVpy}\" - | \"{ffpath}\" -i - -i \"{tmpV}\" -map 0:v:0 {ffau2} -crf {crfo} {codecov} {codecoa} {abo} {ffparamo} \"{outFile}\" -y'
 print(cmdinterp)
